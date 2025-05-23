@@ -1,7 +1,4 @@
-#include <limits>
 #include <linux/futex.h>
-
-#include <iostream> // XXX
 
 #include "workloads/workloads.h"
 
@@ -12,7 +9,8 @@ namespace schtest::workloads {
 constexpr uint32_t consumer_waiter = 0x80000000ul;
 constexpr uint32_t producer_waiter = 0x40000000ul;
 
-void Semaphore::consume(TimeDistribution &latency, uint32_t v, uint32_t wake) {
+void Semaphore::consume(LatencyDistribution &latency, uint32_t v,
+                        uint32_t wake) {
   uint32_t cur = count_.load(std::memory_order_acquire);
   while (true) {
     uint32_t amount = cur & ~(producer_waiter | consumer_waiter);
@@ -39,7 +37,8 @@ void Semaphore::consume(TimeDistribution &latency, uint32_t v, uint32_t wake) {
         }
         cur |= consumer_waiter;
       }
-      int rc = syscall(SYS_futex, &count_, FUTEX_WAIT, cur, nullptr, nullptr, 0);
+      int rc =
+          syscall(SYS_futex, &count_, FUTEX_WAIT, cur, nullptr, nullptr, 0);
       if (rc != -EAGAIN) {
         latency.sample(wake_.elapsed());
       }
@@ -48,7 +47,8 @@ void Semaphore::consume(TimeDistribution &latency, uint32_t v, uint32_t wake) {
   }
 }
 
-void Semaphore::produce(TimeDistribution &latency, uint32_t v, uint32_t wake) {
+void Semaphore::produce(LatencyDistribution &latency, uint32_t v,
+                        uint32_t wake) {
   uint32_t cur = count_.load(std::memory_order_acquire);
   while (true) {
     uint32_t amount = cur & ~(producer_waiter | consumer_waiter);

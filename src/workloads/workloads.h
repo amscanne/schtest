@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "util/clock.h"
+#include "util/stats.h"
 
 namespace schtest::workloads {
 
@@ -26,8 +27,8 @@ public:
   Semaphore &operator=(const Semaphore &) = delete;
   Semaphore &operator=(Semaphore &&) = delete;
 
-  void consume(TimeDistribution &latency, uint32_t v, uint32_t wake = 1);
-  void produce(TimeDistribution &latency, uint32_t v, uint32_t wake = 1);
+  void consume(LatencyDistribution &latency, uint32_t v, uint32_t wake = 1);
+  void produce(LatencyDistribution &latency, uint32_t v, uint32_t wake = 1);
 
 private:
   std::atomic<uint32_t> count_ = 0;

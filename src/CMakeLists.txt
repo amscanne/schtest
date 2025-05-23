@@ -5,6 +5,7 @@ add_subdirectory(workloads)
 add_executable(schtest
   main.cpp
   tests/basic.cpp
+  tests/hyperthreads.cpp
 )
 target_link_libraries(schtest
   sched
