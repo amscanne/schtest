@@ -1,0 +1,4 @@
+Language: Cpp
+AlwaysBreakTemplateDeclarations: true
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
