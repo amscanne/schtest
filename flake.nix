@@ -16,6 +16,7 @@
     packages = forAllSystems (
       { pkgs, system }: {
         default = pkgs.llvmPackages_20.stdenv.mkDerivation {
+          name = "schtest";
           version = "0.1.0";
           src = ./.;
           nativeBuildInputs = [

@@ -3,6 +3,7 @@ project(schtest)
 cmake_policy(SET CMP0167 OLD)
 
 set(CMAKE_CXX_STANDARD 20)
+set(BUILD_SHARED_LIBS OFF)
 
 find_package(GLog REQUIRED)
 find_package(GFlags REQUIRED)
