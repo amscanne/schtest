@@ -7,6 +7,7 @@
 
 #include "sched/sched.h"
 #include "util/result.h"
+#include "util/user.h"
 
 using namespace schtest;
 using namespace schtest::sched;
@@ -154,6 +155,13 @@ int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
 
   if (argc > 1) {
+    // We require root privileges to install a custom scheduler.
+    if (!User::is_root()) {
+      std::cerr << "error: must run as root to install a custom scheduler"
+                << std::endl;
+      return 1;
+    }
+
     // If we are spawning a subprocess, check to see that there is no
     // current sched-ext process installed. We will run one safely, and then
     // wait for it to be installed.
