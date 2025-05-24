@@ -98,8 +98,7 @@ private:
 
   // For comparison of distributions.
   template <typename U>
-  friend bool similar(Distribution<U> &a, Distribution<U> &b,
-                      double confidence);
+  friend double similarity(Distribution<U> &a, Distribution<U> &b);
 };
 
 // Convenience definitions.
@@ -143,15 +142,14 @@ std::ostream &operator<<(std::ostream &os, Distribution<T> &d) {
 }
 
 // Defined in stats.cpp.
-bool similar(folly::SimpleQuantileEstimator<Timer::clock> &a,
-             folly::SimpleQuantileEstimator<Timer::clock> &b,
-             double confidence);
+double similarity(folly::SimpleQuantileEstimator<Timer::clock> &a,
+                  folly::SimpleQuantileEstimator<Timer::clock> &b);
 
 // Determine whether there are statistically significant differences between
 // the two distributions, based on the given confidence.
 template <typename T>
-bool similar(Distribution<T> &a, Distribution<T> &b, double confidence) {
-  return similar(a.estimator_, b.estimator_, confidence);
+double similarity(Distribution<T> &a, Distribution<T> &b) {
+  return similarity(a.estimator_, b.estimator_);
 }
 
 }; // namespace schtest

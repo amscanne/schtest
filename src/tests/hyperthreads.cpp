@@ -1,11 +1,12 @@
 #include <gtest/gtest.h>
 #include <map>
 #include <thread>
-#include <type_traits>
 
+#include "util/benchmark.h"
 #include "util/system.h"
 
 using namespace schtest;
+using namespace schtest::benchmark;
 
 struct SpinControlBlock {
   uint32_t cpu_id;
@@ -51,8 +52,16 @@ TEST(HyperThreads, SpreadingOut) {
     }
   }
 
-  // Map to the unique cores.
-  while (true) {
+  // Expect that the scheduler will run on most physical cores over time, and we
+  // have a criteria that we see it on >=95% of the cores.
+  std::chrono::milliseconds sleeptime(100);
+  auto v = converge(0.95, [&](bool longer) {
+    if (longer) {
+      sleeptime *= 2;
+    }
+    std::this_thread::sleep_for(sleeptime);
+
+    // Map to the unique cores.
     std::map<uint32_t, uint32_t> counts;
     for (const auto &scb : scbs) {
       counts[logical_to_physical[scb->cpu_id]]++;
@@ -60,11 +69,12 @@ TEST(HyperThreads, SpreadingOut) {
     std::cerr << "Cores: " << counts.size() << ", "
               << "Physical cores: " << system->cores().size() << ", "
               << "Threads: " << threads.size() << std::endl;
-    if (counts.size() == system->cores().size()) {
-      break;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
+    return static_cast<double>(counts.size()) /
+           static_cast<double>(system->cores().size());
+  });
+  EXPECT_GE(v, 0.95);
+
+  // Shut it all down.
   for (auto &scb : scbs) {
     scb->running = false;
   }

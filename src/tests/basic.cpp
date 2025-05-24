@@ -11,7 +11,7 @@ using namespace schtest::benchmark;
 
 TEST(Basic, PingPong) {
   auto latency = run<std::chrono::nanoseconds>(
-      std::cerr, 10000,
+      std::cerr, 10000, 0.95,
       [&](size_t iters, Distribution<std::chrono::nanoseconds> &latency) {
         Semaphore sem1(10);
         Semaphore sem2(10);
@@ -30,5 +30,7 @@ TEST(Basic, PingPong) {
         t1.join();
         t2.join();
       });
+
+  // Emit the latency.
   std::cerr << *latency << std::endl;
 }
