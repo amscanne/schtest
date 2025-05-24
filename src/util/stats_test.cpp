@@ -6,224 +6,238 @@
 
 using namespace schtest;
 
-// Test the Histogram constructor with integer type
-TEST(Histogram, IntegerConstructor) {
+TEST(HistogramTest, Constructor) {
   Histogram<int, 10> h(0, 100);
-  // No explicit assertions needed here, just checking that construction works
+  EXPECT_EQ(h.bucket_count(), 11u);
+  EXPECT_EQ(h.min(), 0);
+  EXPECT_EQ(h.max(), 100);
 }
 
-// Test the Histogram constructor with floating-point type
-TEST(Histogram, FloatConstructor) {
-  Histogram<double, 10> h(0.0, 100.0);
-  // No explicit assertions needed here, just checking that construction works
+TEST(HistogramTest, ZeroWidthConstructor) {
+  Histogram<int, 10> h(5, 5);
+  EXPECT_EQ(h.bucket_count(), 1u);
 }
 
-// Test the Histogram constructor with chrono duration type
-TEST(Histogram, ChronoDurationConstructor) {
-  Histogram<std::chrono::nanoseconds, 10> h(std::chrono::nanoseconds(0),
-                                            std::chrono::nanoseconds(100));
-  // No explicit assertions needed here, just checking that construction works
-}
-
-// Test the Histogram constructor with zero width
-TEST(Histogram, ZeroWidthConstructor) {
-  Histogram<int, 10> h(5, 5); // min == max, so width will be 0
-  // No explicit assertions needed here, just checking that construction works
-}
-
-// Test the Histogram add method with integer type
-TEST(Histogram, IntegerAdd) {
-  Histogram<int, 5> h(0, 100);
+TEST(HistogramTest, Add) {
+  Histogram<int, 10> h(0, 100);
   h.add(20);
   h.add(50);
   h.add(80);
-  // No explicit assertions needed here, just checking that add works
+  EXPECT_EQ(h.samples(), 3u);
 }
 
-// Test the Histogram add method with chrono duration type
-TEST(Histogram, ChronoDurationAdd) {
-  Histogram<std::chrono::nanoseconds, 5> h(std::chrono::nanoseconds(0),
-                                           std::chrono::nanoseconds(100));
+TEST(HistogramTest, AddAtUpperBound) {
+  Histogram<int, 5> h(0, 100);
+  h.add(100);
+  EXPECT_EQ(h.samples(), 1u);
+}
+
+TEST(HistogramTest, ZeroWidthAdd) {
+  Histogram<int, 5> h(5, 5);
+  h.add(5);
+  EXPECT_EQ(h.samples(), 1u);
+}
+
+TEST(HistogramTest, Output) {
+  Histogram<int, 10> h(0, 100);
+  h.add(20);
+  h.add(50);
+  h.add(80);
+  std::stringstream ss;
+  ss << h;
+  EXPECT_FALSE(ss.str().empty());
+}
+
+TEST(HistogramTest, DoubleConstructor) {
+  Histogram<double, 10> h(0.0, 100.0);
+  EXPECT_EQ(h.bucket_count(), 11u);
+  EXPECT_DOUBLE_EQ(h.min(), 0.0);
+  EXPECT_DOUBLE_EQ(h.max(), 100.0);
+}
+
+TEST(HistogramTest, DoubleZeroWidthConstructor) {
+  Histogram<double, 10> h(5.0, 5.0);
+  EXPECT_EQ(h.bucket_count(), 1u);
+}
+
+TEST(HistogramTest, DoubleAdd) {
+  Histogram<double, 10> h(0.0, 100.0);
+  h.add(20.0);
+  h.add(50.0);
+  h.add(80.0);
+  EXPECT_EQ(h.samples(), 3u);
+}
+
+TEST(HistogramTest, DoubleAddAtUpperBound) {
+  Histogram<double, 5> h(0.0, 100.0);
+  h.add(100.0);
+  EXPECT_EQ(h.samples(), 1u);
+}
+
+TEST(HistogramTest, DoubleZeroWidthAdd) {
+  Histogram<double, 5> h(5.0, 5.0);
+  h.add(5.0);
+  EXPECT_EQ(h.samples(), 1u);
+}
+
+TEST(HistogramTest, DoubleOutput) {
+  Histogram<double, 10> h(0.0, 100.0);
+  h.add(20.0);
+  h.add(50.0);
+  h.add(80.0);
+  std::stringstream ss;
+  ss << h;
+  EXPECT_FALSE(ss.str().empty());
+}
+
+TEST(HistogramTest, DurationConstructor) {
+  Histogram<std::chrono::nanoseconds, 10> h(std::chrono::nanoseconds(0),
+                                            std::chrono::nanoseconds(100));
+  EXPECT_EQ(h.bucket_count(), 11u);
+  EXPECT_EQ(h.min(), std::chrono::nanoseconds(0));
+  EXPECT_EQ(h.max(), std::chrono::nanoseconds(100));
+}
+
+TEST(HistogramTest, DurationZeroWidthConstructor) {
+  Histogram<std::chrono::nanoseconds, 10> h(std::chrono::nanoseconds(5),
+                                            std::chrono::nanoseconds(5));
+  EXPECT_EQ(h.bucket_count(), 1u);
+}
+
+TEST(HistogramTest, DurationAdd) {
+  Histogram<std::chrono::nanoseconds, 10> h(std::chrono::nanoseconds(0),
+                                            std::chrono::nanoseconds(100));
   h.add(std::chrono::nanoseconds(20));
   h.add(std::chrono::nanoseconds(50));
   h.add(std::chrono::nanoseconds(80));
-  // No explicit assertions needed here, just checking that add works
+  EXPECT_EQ(h.samples(), 3u);
 }
 
-// Test the Histogram add method with zero width
-TEST(Histogram, ZeroWidthAdd) {
-  Histogram<int, 5> h(5, 5); // min == max, so width will be 0
-  h.add(5);
-  // No explicit assertions needed here, just checking that add works with zero
-  // width
+TEST(HistogramTest, DurationAddAtUpperBound) {
+  Histogram<std::chrono::nanoseconds, 5> h(std::chrono::nanoseconds(0),
+                                           std::chrono::nanoseconds(100));
+  h.add(std::chrono::nanoseconds(100));
+  EXPECT_EQ(h.samples(), 1u);
 }
 
-// Test the Distribution sample method with integer type
-TEST(Distribution, IntegerSample) {
+TEST(HistogramTest, DurationZeroWidthAdd) {
+  Histogram<std::chrono::nanoseconds, 5> h(std::chrono::nanoseconds(5),
+                                           std::chrono::nanoseconds(5));
+  h.add(std::chrono::nanoseconds(5));
+  EXPECT_EQ(h.samples(), 1u);
+}
+
+TEST(HistogramTest, DurationOutput) {
+  Histogram<std::chrono::nanoseconds, 10> h(std::chrono::nanoseconds(0),
+                                            std::chrono::nanoseconds(100));
+  h.add(std::chrono::nanoseconds(20));
+  h.add(std::chrono::nanoseconds(50));
+  h.add(std::chrono::nanoseconds(80));
+  std::stringstream ss;
+  ss << h;
+  EXPECT_FALSE(ss.str().empty());
+}
+
+TEST(DistributionTest, IntSample) {
   Distribution<int> d;
   d.sample(10);
   d.sample(20);
   d.sample(30);
-  // No explicit assertions needed here, just checking that sample works
 }
 
-// Test the Distribution sample method with floating-point type
-TEST(Distribution, FloatSample) {
+TEST(DistributionTest, DoubleSample) {
   Distribution<double> d;
   d.sample(10.5);
   d.sample(20.5);
   d.sample(30.5);
-  // No explicit assertions needed here, just checking that sample works
 }
 
-// Test the Distribution sample method with chrono duration type
-TEST(Distribution, ChronoDurationSample) {
+TEST(DistributionTest, DurationSample) {
   Distribution<std::chrono::nanoseconds> d;
   d.sample(std::chrono::nanoseconds(10));
   d.sample(std::chrono::nanoseconds(20));
   d.sample(std::chrono::nanoseconds(30));
-  // No explicit assertions needed here, just checking that sample works
 }
 
-// Test the Distribution histogram method with integer type
-TEST(Distribution, IntegerHistogram) {
+TEST(DistributionTest, IntHistogram) {
   Distribution<int> d;
-  // Add a range of values to get a meaningful distribution
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 1000; i++)
     d.sample(i);
-  }
-
   auto h = d.histogram<10>();
-  // No explicit assertions needed here, just checking that histogram works
+  EXPECT_EQ(h.bucket_count(), 11u);
 }
 
-// Test the Distribution histogram method with chrono duration type
-TEST(Distribution, ChronoDurationHistogram) {
+TEST(DistributionTest, DurationHistogram) {
   Distribution<std::chrono::nanoseconds> d;
-  // Add a range of values to get a meaningful distribution
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 1000; i++)
     d.sample(std::chrono::nanoseconds(i));
-  }
-
   auto h = d.histogram<10>();
-  // No explicit assertions needed here, just checking that histogram works
+  EXPECT_EQ(h.bucket_count(), 11u);
 }
 
-// Test the similar function with integer distributions
-TEST(Distribution, SimilarIntegerDistributions) {
-  Distribution<int> d1;
-  Distribution<int> d2;
-
-  // Add similar values to both distributions
+TEST(DistributionTest, IntSimilarDistributions) {
+  Distribution<int> d1, d2;
   for (int i = 0; i < 1000; i++) {
     d1.sample(i);
     d2.sample(i);
   }
-
-  // These should be similar with high confidence
-  EXPECT_TRUE(similar(d1, d2, 0.95));
+  EXPECT_GT(similarity(d1, d2), 0.95);
 }
 
-// Test the similar function with different integer distributions
-TEST(Distribution, DifferentIntegerDistributions) {
-  Distribution<int> d1;
-  Distribution<int> d2;
-
-  // Add different ranges of values to the distributions
+TEST(DistributionTest, IntDifferentDistributions) {
+  Distribution<int> d1, d2;
   for (int i = 0; i < 1000; i++) {
     d1.sample(i);
-    d2.sample(i + 500); // Shifted by 500
+    d2.sample(i + 500);
   }
-
-  // These should not be similar with high confidence
-  EXPECT_FALSE(similar(d1, d2, 0.95));
+  EXPECT_LT(similarity(d1, d2), 0.95);
 }
 
-// Test the similar function with chrono duration distributions
-TEST(Distribution, SimilarChronoDurationDistributions) {
-  Distribution<std::chrono::nanoseconds> d1;
-  Distribution<std::chrono::nanoseconds> d2;
-
-  // Add similar values to both distributions
+TEST(DistributionTest, DurationSimilarDistributions) {
+  Distribution<std::chrono::nanoseconds> d1, d2;
   for (int i = 0; i < 1000; i++) {
     d1.sample(std::chrono::nanoseconds(i));
     d2.sample(std::chrono::nanoseconds(i));
   }
-
-  // These should be similar with high confidence
-  EXPECT_TRUE(similar(d1, d2, 0.95));
+  EXPECT_GT(similarity(d1, d2), 0.95);
 }
 
-// Test the similar function with different chrono duration distributions
-TEST(Distribution, DifferentChronoDurationDistributions) {
-  Distribution<std::chrono::nanoseconds> d1;
-  Distribution<std::chrono::nanoseconds> d2;
-
-  // Add different ranges of values to the distributions
+TEST(DistributionTest, DurationDifferentDistributions) {
+  Distribution<std::chrono::nanoseconds> d1, d2;
   for (int i = 0; i < 1000; i++) {
     d1.sample(std::chrono::nanoseconds(i));
-    d2.sample(std::chrono::nanoseconds(i + 500)); // Shifted by 500
+    d2.sample(std::chrono::nanoseconds(i + 500));
   }
-
-  // These should not be similar with high confidence
-  EXPECT_FALSE(similar(d1, d2, 0.95));
+  EXPECT_LT(similarity(d1, d2), 0.95);
 }
 
-// Test the operator<< for Histogram
-TEST(Histogram, HistogramOutput) {
-  Histogram<int, 5> h(0, 100);
-  h.add(20);
-  h.add(50);
-  h.add(80);
-
-  std::stringstream ss;
-  ss << h;
-
-  // Check that the output is not empty
-  EXPECT_FALSE(ss.str().empty());
-}
-
-// Test the operator<< for Distribution
-TEST(Distribution, DistributionOutput) {
+TEST(DistributionTest, IntOutput) {
   Distribution<int> d;
   d.sample(10);
   d.sample(20);
   d.sample(30);
-
   std::stringstream ss;
   ss << d;
-
-  // Check that the output is not empty
   EXPECT_FALSE(ss.str().empty());
 }
 
-// Test the LatencyDistribution typedef
-TEST(Distribution, LatencyDistributionTypeDef) {
+TEST(DistributionTest, DurationLatencyDistributionTypeDef) {
   LatencyDistribution d;
   d.sample(std::chrono::nanoseconds(10));
   d.sample(std::chrono::nanoseconds(20));
   d.sample(std::chrono::nanoseconds(30));
-
   std::stringstream ss;
   ss << d;
-
-  // Check that the output is not empty
   EXPECT_FALSE(ss.str().empty());
 }
 
-// Test the zscore function indirectly through the similar function
-TEST(Distribution, ZScoreViaSimlar) {
-  Distribution<int> d1;
-  Distribution<int> d2;
-
-  // Add similar values to both distributions
+TEST(DistributionTest, IntZScoreViaSimilar) {
+  Distribution<int> d1, d2;
   for (int i = 0; i < 1000; i++) {
     d1.sample(i);
     d2.sample(i);
   }
-
-  // Test with different confidence levels
-  EXPECT_TRUE(similar(d1, d2, 0.95));
-  EXPECT_TRUE(similar(d1, d2, 0.99));
-  EXPECT_TRUE(similar(d1, d2, 0.999));
+  EXPECT_GT(similarity(d1, d2), 0.95);
+  EXPECT_GT(similarity(d1, d2), 0.99);
+  EXPECT_GT(similarity(d1, d2), 0.999);
 }

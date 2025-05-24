@@ -11,7 +11,7 @@ TEST(Cgroups, CreateAndDestroy) {
 
   // Create a new cgroup
   auto cgroup_result = Cgroup::create(cgroup_name);
-  ASSERT_TRUE(cgroup_result)
+  ASSERT_TRUE(cgroup_result.ok())
       << "Failed to create cgroup: " << cgroup_result.takeError();
 
   // Get the cgroup object
@@ -31,7 +31,7 @@ TEST(Cgroups, MoveSemantics) {
 
   // Create a new cgroup
   auto cgroup_result = Cgroup::create(cgroup_name);
-  ASSERT_TRUE(cgroup_result);
+  ASSERT_TRUE(cgroup_result.ok());
 
   // Get the cgroup object
   Cgroup cgroup1 = std::move(*cgroup_result);
@@ -55,7 +55,7 @@ TEST(Cgroups, ErrorHandling) {
   auto cgroup_result = Cgroup::create("/invalid/name");
 
   // This should fail
-  ASSERT_FALSE(cgroup_result);
+  ASSERT_FALSE(cgroup_result.ok());
 
   // Take the error and verify it's not empty
   Error error = cgroup_result.takeError();

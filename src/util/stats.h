@@ -1,14 +1,18 @@
 #pragma once
 
 #include <chrono>
+#include <cmath>
+#include <cstddef>
 #include <folly/stats/QuantileEstimator.h>
+#include <gtest/gtest_prod.h>
 #include <iostream>
+#include <vector>
 
 #include "util/clock.h"
 
 namespace schtest {
 
-template <typename T, size_t B>
+template <typename T, std::size_t B>
 class Histogram {
 public:
   Histogram(T min, T max)
@@ -34,19 +38,26 @@ public:
     if (buckets_.size() == 1) {
       buckets_[0]++;
     } else {
-      buckets_[static_cast<size_t>((data - min_) / width_)]++;
+      buckets_[static_cast<std::size_t>((data - min_) / width_)]++;
     }
   }
+
+  // Accessors for test verification.
+  T min() const { return min_; }
+  T max() const { return max_; }
+  T width() const { return width_; }
+  std::size_t samples() const { return samples_; }
+  std::size_t bucket_count() const { return buckets_.size(); }
 
 private:
   T min_;
   T max_;
   T width_;
-  size_t samples_;
-  std::vector<size_t> buckets_;
+  std::size_t samples_;
+  std::vector<std::size_t> buckets_;
 
   // For printing below.
-  template <typename U, size_t C>
+  template <typename U, std::size_t C>
   friend std::ostream &operator<<(std::ostream &os, const Histogram<U, C> &h);
 };
 
@@ -57,14 +68,14 @@ public:
   void sample(T data) {
     double v;
     if constexpr (std::is_same_v<T, std::chrono::nanoseconds>) {
-      v = std::chrono::duration<double>(data).count();
+      v = std::chrono::duration<double, std::nano>(data).count();
     } else {
       v = static_cast<double>(data);
     }
     estimator_.addValue(v);
   }
 
-  template <size_t B>
+  template <std::size_t B>
   Histogram<T, B> histogram() {
     constexpr double minq = 0.001;
     constexpr double maxq = 0.999;
@@ -85,8 +96,7 @@ private:
   // Restore the original data type from an estimate.
   T restore(double v) {
     if constexpr (std::is_same_v<T, std::chrono::nanoseconds>) {
-      return std::chrono::duration_cast<std::chrono::nanoseconds>(
-          std::chrono::duration<double>(v));
+      return std::chrono::nanoseconds(static_cast<long long>(v));
     } else {
       return static_cast<T>(v);
     }
@@ -105,15 +115,15 @@ private:
 using LatencyDistribution = Distribution<std::chrono::nanoseconds>;
 
 // Pretty print a histogram.
-template <typename T, size_t B>
+template <typename T, std::size_t B>
 std::ostream &operator<<(std::ostream &os, const Histogram<T, B> &h) {
-  constexpr size_t bar_width = 30;
+  constexpr std::size_t bar_width = 30;
   auto value = h.min_;
   for (const auto &b : h.buckets_) {
     os << "[";
-    size_t chars = static_cast<size_t>(std::ceil(
+    auto chars = static_cast<std::size_t>(std::ceil(
         static_cast<double>(bar_width * b) / static_cast<double>(h.samples_)));
-    size_t done = 0;
+    std::size_t done = 0;
     for (; done < chars; done++) {
       os << "#";
     }

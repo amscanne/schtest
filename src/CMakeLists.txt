@@ -10,6 +10,6 @@ add_executable(schtest
 target_link_libraries(schtest
   sched
   util
-  gtest
+  GTest::gtest
   workloads
 )

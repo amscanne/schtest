@@ -14,7 +14,7 @@ public:
   Error &operator=(Error &&other) = delete;
 
   Error(std::string &&msg, int err)
-      : msg_(std::move(msg)), err_(err), checked_(false){};
+      : msg_(std::move(msg)), err_(err), checked_(false) {};
   Error(std::string &&msg, Error &&other)
       : msg_(std::move(msg) + ": " + other.msg_), err_(other.err_),
         checked_(false) {}
@@ -47,10 +47,11 @@ class OK {};
 template <typename T = OK>
 class Result {
 public:
-  Result(T &&value) : value_(std::move(value)){};
-  Result(Error &&error) : value_(std::move(error)){};
+  Result(T &&value) : value_(std::move(value)) {};
+  Result(Error &&error) : value_(std::move(error)) {};
 
-  operator bool() {
+  operator bool() { return ok(); }
+  bool ok() {
     bool v = std::holds_alternative<T>(value_);
     if (!v) {
       // Set that the error has been checked.

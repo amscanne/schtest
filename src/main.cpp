@@ -1,10 +1,12 @@
+#include <cassert>
 #include <cstdlib>
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <sys/prctl.h>
-#include <thread>
+#include <sys/syscall.h>
 
 #include "sched/sched.h"
+#include "util/result.h"
 
 using namespace schtest;
 using namespace schtest::sched;
@@ -22,7 +24,7 @@ struct ChildContext {
 
 class ParentContext {
 public:
-  ParentContext(pid_t pid) : child_(pid){};
+  ParentContext(pid_t pid) : child_(pid) {};
 
   // Determine if the child is still alive.
   bool alive() {
@@ -57,16 +59,16 @@ static void child(ChildContext *ctx) {
   // Ensure that we die when the child dies.
   int rc = prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
   if (rc < 0) {
-    write(ctx->notify_fd, &rc, sizeof(rc));
-    close(ctx->notify_fd);
+    assert(write(ctx->notify_fd, &rc, sizeof(rc)) == 1);
+    assert(close(ctx->notify_fd) == 0);
     exit(1);
   }
 
   // Spawn the given child process.
   pid_t child = fork();
   if (child < 0) {
-    write(ctx->notify_fd, &child, sizeof(child));
-    close(ctx->notify_fd);
+    assert(write(ctx->notify_fd, &child, sizeof(child)) == 1);
+    assert(close(ctx->notify_fd) == 0);
     exit(1);
   }
   if (child == 0) {
@@ -75,8 +77,8 @@ static void child(ChildContext *ctx) {
     // namespace will be killed. This covers the case when the child here
     // attempts ot daemonize or anything else like that.
     rc = execvp(*ctx->argv, ctx->argv);
-    write(ctx->notify_fd, &child, sizeof(child));
-    close(ctx->notify_fd);
+    assert(write(ctx->notify_fd, &child, sizeof(child)) == 0);
+    assert(close(ctx->notify_fd) == 0);
     exit(1);
   }
 
