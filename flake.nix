@@ -1,6 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nix-appimage.url = "github:ralismark/nix-appimage";
   };
 
   outputs = { self, nixpkgs, ... }:
@@ -14,7 +15,7 @@
   in
   {
     packages = forAllSystems (
-      { pkgs, system }: {
+      { pkgs, system }: rec {
         default = pkgs.llvmPackages_20.stdenv.mkDerivation {
           name = "schtest";
           version = "0.1.0";
@@ -33,7 +34,7 @@
             pkgs.gtest
             pkgs.jemalloc
           ];
-          installPhase = "cmake --install build";
+          installPhase = ''cmake --install . --prefix $out;'';
         };
       }
     );

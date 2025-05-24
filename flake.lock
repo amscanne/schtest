@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "nix-appimage": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1725758175,
+        "narHash": "sha256-MhBOJHYhIJ30TNVrm7wX8B3x+MecMCdaBc94g4HXkPs=",
+        "owner": "ralismark",
+        "repo": "nix-appimage",
+        "rev": "fc1192dbec82f5857f86ccc6dfdf2ad97bc9c62a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ralismark",
+        "repo": "nix-appimage",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1747953325,
@@ -18,6 +34,7 @@
     },
     "root": {
       "inputs": {
+        "nix-appimage": "nix-appimage",
         "nixpkgs": "nixpkgs"
       }
     }
