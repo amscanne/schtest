@@ -1,7 +1,7 @@
 #include <cassert>
 
+#include "util/clock.h"
 #include "util/stats.h"
-#include <folly/stats/QuantileEstimator.h>
 
 namespace schtest {
 
@@ -17,66 +17,46 @@ std::ostream &operator<<(std::ostream &os,
   return os;
 }
 
-double normCDF(double zscore) {
-  return 0.5 * (1 + std::erf(zscore / std::sqrt(2.0)));
-}
-
-static inline double nearest_quantile(const folly::QuantileEstimates &quantiles,
-                                      double q) {
-  // Find the nearest quantile to the given value, and compute
-  // the linear interpolation between this and the next nearest
-  // quantile. Of course, if there is an exact match, we just return
-  // the value directly.
-  if (quantiles.quantiles.empty()) {
-    return 0.0;
-  }
-  auto it =
-      std::lower_bound(quantiles.quantiles.begin(), quantiles.quantiles.end(),
-                       q, [](const auto &a, double b) { return a.first < b; });
-  if (it == quantiles.quantiles.end()) {
-    // If we are past the last quantile, just return the last value.
-    return quantiles.quantiles.back().second;
-  } else if (it->first == q) {
-    // If we have an exact match, return the value.
-    return it->second;
-  } else if (it == quantiles.quantiles.begin()) {
-    // If we are before the first quantile, just return the first value.
-    return quantiles.quantiles.front().second;
+static double width(const folly::QuantileEstimates &a, size_t index) {
+  double before = 0.0;
+  if (index == 0) {
+    before = a.quantiles[0].first;
   } else {
-    // Otherwise, we need to interpolate between the two nearest quantiles.
-    auto prev = std::prev(it);
-    double ratio = (q - prev->first) / (it->first - prev->first);
-    return prev->second + ratio * (it->second - prev->second);
+    before = (a.quantiles[index].first - a.quantiles[index - 1].first) / 2.0;
   }
+  double after = 0.0;
+  if (index == a.quantiles.size() - 1) {
+    after = 1.0 - a.quantiles[index].first;
+  } else {
+    after = (a.quantiles[index + 1].first - a.quantiles[index].first) / 2.0;
+  }
+  return before + after;
 }
 
-static inline double
-stddev_estimate(const folly::QuantileEstimates &quantiles) {
-  // Estimate the standard deviation of the distribution based on the
-  // quantiles. We use the 16th and 84th percentiles to estimate the
-  // standard deviation.
-  double q16 = nearest_quantile(quantiles, 0.16);
-  double q84 = nearest_quantile(quantiles, 0.84);
-  return (q84 - q16) / 2.0; // This is a rough estimate of stddev.
+static double distance(const folly::QuantileEstimates &a,
+                       const folly::QuantileEstimates &b) {
+  // This function computes the Kolmogorov–Smirnov distance between two
+  // different distributions. Since we have the quantiles, we need to do
+  // it a bit sideways, but it's the same idea; the difference between
+  // thw two CDF functions (which fits in the [0.0, 1.0] range).
+  assert(a.quantiles.size() == b.quantiles.size());
+  double distance = 0.0;
+  double total_min =
+      std::min(a.quantiles.front().second, b.quantiles.front().second);
+  double total_max =
+      std::max(a.quantiles.back().second, b.quantiles.back().second);
+  double total = total_max - total_min;
+  for (size_t i = 0; i < a.quantiles.size(); i++) {
+    assert(a.quantiles[i].first == b.quantiles[i].first);
+    double delta = std::abs(a.quantiles[i].second - b.quantiles[i].second);
+    distance += width(a, i) * delta;
+  }
+  return distance / (total_max - total_min);
 }
 
 double similarity(const folly::QuantileEstimates &a,
                   const folly::QuantileEstimates &b) {
-  // We don't consider the mean here, but rather consider the p50 to be the
-  // center of the actual distribution. This basically throws out all the data
-  // that would bias to one side or another, and makes the distributions more
-  // comparable.
-  double mean_a = nearest_quantile(a, 0.5);
-  double mean_b = nearest_quantile(b, 0.5);
-  double mean_diff = std::abs(mean_a = -mean_b);
-  double stddev_a = stddev_estimate(a);
-  double stddev_b = stddev_estimate(b);
-  double z_a = mean_diff / stddev_a;
-  double z_b = mean_diff / stddev_b;
-  double p_a = normCDF(z_a / 2) - normCDF(-z_a / 2);
-  double p_b = normCDF(z_b / 2) - normCDF(-z_b / 2);
-  double confidence = 1.0 - std::min(p_a, p_b);
-  return confidence;
+  return 1.0 - distance(a, b);
 }
 
 } // namespace schtest

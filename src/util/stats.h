@@ -2,7 +2,7 @@
 
 #include <chrono>
 #include <cmath>
-#include <cstddef>
+#include <folly/stats/QuantileEstimator.h>
 #include <folly/stats/QuantileHistogram.h>
 #include <gtest/gtest_prod.h>
 #include <iostream>
@@ -11,6 +11,10 @@
 
 namespace schtest {
 
+// Defined in stats.cpp.
+std::ostream &operator<<(std::ostream &os,
+                         const folly::QuantileEstimates &estimates);
+
 template <typename T>
 class Distribution {
 public:
@@ -18,7 +22,7 @@ public:
   void sample(T data) {
     double v;
     if constexpr (std::is_same_v<T, std::chrono::nanoseconds>) {
-      v = std::chrono::duration<double, std::nano>(data).count();
+      v = std::chrono::duration<double>(data).count();
     } else {
       v = static_cast<double>(data);
     }
@@ -27,7 +31,7 @@ public:
 
   // Return the current estimates of the distribution.
   folly::QuantileEstimates estimates() {
-    folly::QuantileEstimates estimates;
+    folly::QuantileEstimates estimates = {};
     estimates.count = estimator_.count();
     auto quantiles = estimator_.quantiles();
     estimates.quantiles.reserve(quantiles.size());
@@ -53,10 +57,6 @@ private:
 
 // Convenience definitions.
 using LatencyDistribution = Distribution<std::chrono::nanoseconds>;
-
-// Defined in stats.cpp.
-std::ostream &operator<<(std::ostream &os,
-                         const folly::QuantileEstimates &estimates);
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, Distribution<T> &d) {
