@@ -28,6 +28,7 @@
           ];
           buildInputs = [
             pkgs.boost
+            pkgs.double-conversion
             pkgs.folly
             pkgs.gflags
             pkgs.glog

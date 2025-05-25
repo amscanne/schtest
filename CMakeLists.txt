@@ -12,5 +12,7 @@ find_package(Folly REQUIRED)
 enable_testing()
 include(CTest)
 
+add_compile_definitions(-DGLOG_USE_GLOG_EXPORT)
+
 include_directories(${CMAKE_SOURCE_DIR}/src)
 add_subdirectory(src)

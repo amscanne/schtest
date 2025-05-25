@@ -3,63 +3,13 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
-#include <folly/stats/QuantileEstimator.h>
+#include <folly/stats/QuantileHistogram.h>
 #include <gtest/gtest_prod.h>
 #include <iostream>
-#include <vector>
 
 #include "util/clock.h"
 
 namespace schtest {
-
-template <typename T, std::size_t B>
-class Histogram {
-public:
-  Histogram(T min, T max)
-      : min_(min), max_(max), width_((max - min) / static_cast<T>(B)),
-        samples_(0) {
-    // Ensure that the width is sensible.
-    if constexpr (std::is_same_v<T, std::chrono::nanoseconds>) {
-      if (width_ == std::chrono::nanoseconds::zero()) {
-        buckets_.resize(1);
-      } else {
-        buckets_.resize(B + 1);
-      }
-    } else {
-      if (width_ == 0) {
-        buckets_.resize(1);
-      } else {
-        buckets_.resize(B + 1);
-      }
-    }
-  }
-  void add(T data) {
-    samples_++;
-    if (buckets_.size() == 1) {
-      buckets_[0]++;
-    } else {
-      buckets_[static_cast<std::size_t>((data - min_) / width_)]++;
-    }
-  }
-
-  // Accessors for test verification.
-  T min() const { return min_; }
-  T max() const { return max_; }
-  T width() const { return width_; }
-  std::size_t samples() const { return samples_; }
-  std::size_t bucket_count() const { return buckets_.size(); }
-
-private:
-  T min_;
-  T max_;
-  T width_;
-  std::size_t samples_;
-  std::vector<std::size_t> buckets_;
-
-  // For printing below.
-  template <typename U, std::size_t C>
-  friend std::ostream &operator<<(std::ostream &os, const Histogram<U, C> &h);
-};
 
 template <typename T>
 class Distribution {
@@ -75,23 +25,21 @@ public:
     estimator_.addValue(v);
   }
 
-  template <std::size_t B>
-  Histogram<T, B> histogram() {
-    constexpr double minq = 0.001;
-    constexpr double maxq = 0.999;
-    estimator_.flush();
-    auto digest = estimator_.getDigest();
-    auto min = restore(digest.estimateQuantile(minq));
-    auto max = restore(digest.estimateQuantile(maxq));
-    Histogram<T, B> h(min, max);
-    for (double p = minq; p <= maxq; p += 0.001) {
-      h.add(restore(digest.estimateQuantile(p)));
+  // Return the current estimates of the distribution.
+  folly::QuantileEstimates estimates() {
+    folly::QuantileEstimates estimates;
+    estimates.count = estimator_.count();
+    auto quantiles = estimator_.quantiles();
+    estimates.quantiles.reserve(quantiles.size());
+    for (const auto &q : quantiles) {
+      auto v = estimator_.estimateQuantile(q);
+      estimates.quantiles.emplace_back(q, v);
     }
-    return h;
+    return estimates;
   }
 
 private:
-  folly::SimpleQuantileEstimator<Timer::clock> estimator_;
+  folly::CPUShardedQuantileHistogram<> estimator_;
 
   // Restore the original data type from an estimate.
   T restore(double v) {
@@ -101,65 +49,30 @@ private:
       return static_cast<T>(v);
     }
   }
-
-  // For printing below.
-  template <typename U>
-  friend std::ostream &operator<<(std::ostream &os, Distribution<U> &);
-
-  // For comparison of distributions.
-  template <typename U>
-  friend double similarity(Distribution<U> &a, Distribution<U> &b);
 };
 
 // Convenience definitions.
 using LatencyDistribution = Distribution<std::chrono::nanoseconds>;
 
-// Pretty print a histogram.
-template <typename T, std::size_t B>
-std::ostream &operator<<(std::ostream &os, const Histogram<T, B> &h) {
-  constexpr std::size_t bar_width = 30;
-  auto value = h.min_;
-  for (const auto &b : h.buckets_) {
-    os << "[";
-    auto chars = static_cast<std::size_t>(std::ceil(
-        static_cast<double>(bar_width * b) / static_cast<double>(h.samples_)));
-    std::size_t done = 0;
-    for (; done < chars; done++) {
-      os << "#";
-    }
-    for (; done < bar_width; done++) {
-      os << " ";
-    }
-    os << "] ";
-    os << value;
-    os << std::endl;
-    value += h.width_;
-  }
-  return os;
-}
-
 // Defined in stats.cpp.
-std::ostream &operator<<(std::ostream &os, folly::QuantileEstimates &estimates);
+std::ostream &operator<<(std::ostream &os,
+                         const folly::QuantileEstimates &estimates);
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, Distribution<T> &d) {
-  constexpr std::array<double, 7> kQuantiles{
-      {.001, .01, .1, .5, .9, .99, .999}};
-  d.estimator_.flush();
-  auto estimates = d.estimator_.estimateQuantiles(kQuantiles);
-  os << estimates;
+  os << d.estimates();
   return os;
 }
 
 // Defined in stats.cpp.
-double similarity(folly::SimpleQuantileEstimator<Timer::clock> &a,
-                  folly::SimpleQuantileEstimator<Timer::clock> &b);
+double similarity(const folly::QuantileEstimates &a,
+                  const folly::QuantileEstimates &b);
 
 // Determine whether there are statistically significant differences between
 // the two distributions, based on the given confidence.
 template <typename T>
 double similarity(Distribution<T> &a, Distribution<T> &b) {
-  return similarity(a.estimator_, b.estimator_);
+  return similarity(a.estimates(), b.estimates());
 }
 
 }; // namespace schtest
