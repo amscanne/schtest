@@ -69,7 +69,7 @@ TEST(DistributionTest, IntOutput) {
   d.sample(20);
   d.sample(30);
   std::stringstream ss;
-  ss << d;
+  ss << d.estimates();
   EXPECT_FALSE(ss.str().empty());
 }
 
@@ -79,7 +79,7 @@ TEST(DistributionTest, DurationLatencyDistributionTypeDef) {
   d.sample(std::chrono::nanoseconds(20));
   d.sample(std::chrono::nanoseconds(30));
   std::stringstream ss;
-  ss << d;
+  ss << d.estimates();
   EXPECT_FALSE(ss.str().empty());
 }
 

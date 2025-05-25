@@ -1,6 +1,7 @@
 add_library(util
   clock.cpp
   cgroups.cpp
+  output.cpp
   result.cpp
   stats.cpp
   system.cpp

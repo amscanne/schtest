@@ -2,12 +2,14 @@
 #include <thread>
 
 #include "util/benchmark.h"
+#include "util/output.h"
 #include "util/stats.h"
 #include "workloads/workloads.h"
 
 using namespace schtest;
 using namespace schtest::workloads;
 using namespace schtest::benchmark;
+using namespace schtest::output;
 
 TEST(Basic, PingPong) {
   auto latency = run<std::chrono::nanoseconds>(
@@ -32,5 +34,5 @@ TEST(Basic, PingPong) {
       });
 
   // Emit the latency.
-  std::cerr << *latency << std::endl;
+  log() << latency->estimates();
 }

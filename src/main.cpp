@@ -1,15 +1,18 @@
 #include <cassert>
 #include <cstdlib>
 #include <fcntl.h>
+#include <gflags/gflags.h>
 #include <gtest/gtest.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 
 #include "sched/sched.h"
+#include "util/output.h"
 #include "util/result.h"
 #include "util/user.h"
 
 using namespace schtest;
+using namespace schtest::output;
 using namespace schtest::sched;
 
 struct ChildContext {
@@ -151,8 +154,60 @@ static Result<ParentContext> spawn(char **argv) {
   }
 }
 
+const static char *usage =
+    R"(schtest <flags> [--] [<binary> [flags...]]
+
+This program drives a series of scheduler tests. It is used to drive simulated 
+workloads, and assert functional properties of the scheduler, which map to test
+results that are emitted. There are also standardized benchmarks.
+
+If an additional binary is given, it will be run safetly and the program will
+ensure that a custom scheduer is installed before any tests are run. This requires
+root privileges.
+)";
+
+static const char *flags = R"(
+  Flags:
+    -list
+    -min_time (minimum time to run benchmarks) type: double default: 1.0
+    -filter (list all available tests and benchmarks) type: string default: ""
+    -helpfull (show full help message for all libraries and flags)
+)";
+
+DEFINE_bool(h, false, "show a short help messsage");
+DEFINE_double(min_time, 1.0, "minimum time to run benchmarks");
+DEFINE_string(filter, "",
+              "filter to apply to the list of tests and benchmarks");
+DEFINE_bool(list, false, "list all available tests and benchmarks");
+DECLARE_string(helpmatch);
+DECLARE_bool(help);
+
 int main(int argc, char **argv) {
-  testing::InitGoogleTest(&argc, argv);
+  gflags::SetUsageMessage(usage);
+  gflags::ParseCommandLineNonHelpFlags(&argc, &argv, true);
+  if (FLAGS_help || FLAGS_h) {
+    std::cout << argv[0] << ": " << usage;
+    std::cout << flags;
+    exit(1);
+  }
+  gflags::HandleCommandLineHelpFlags();
+
+  // Build our custom google test flags.
+  std::vector<std::string> gtest_flags;
+  std::vector<const char *> gtest_argv;
+  gtest_flags.push_back(argv[0]);
+  if (FLAGS_list) {
+    gtest_flags.push_back("--gtest_list_tests");
+  }
+  if (!FLAGS_filter.empty()) {
+    gtest_flags.push_back("--gtest_filter=" + FLAGS_filter);
+  }
+  int gtest_argc = gtest_flags.size();
+  for (const auto &flag : gtest_flags) {
+    gtest_argv.push_back(flag.c_str());
+  }
+  gtest_argv.push_back(nullptr);
+  testing::InitGoogleTest(&gtest_argc, const_cast<char **>(gtest_argv.data()));
 
   if (argc > 1) {
     // We require root privileges to install a custom scheduler.
@@ -211,6 +266,18 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Start our subprocess, which runs init
+  testing::UnitTest &unit_test = *testing::UnitTest::GetInstance();
+  testing::TestEventListeners &listeners = unit_test.listeners();
+
+  // Removes the default console output listener from the list so it will
+  // not receive events from Google Test and won't print any output. We transfer
+  // ownership to our own singleton object, which is capable of producing other
+  // kinds of output.
+  std::unique_ptr<testing::TestEventListener> output(
+      listeners.Release(listeners.default_result_printer()));
+  testing::TestEventListener *custom = Output::setup(std::move(output));
+  listeners.Append(custom);
+
+  // Run all tests.
   return RUN_ALL_TESTS();
 }

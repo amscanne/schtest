@@ -7,8 +7,6 @@
 #include <gtest/gtest_prod.h>
 #include <iostream>
 
-#include "util/clock.h"
-
 namespace schtest {
 
 // Defined in stats.cpp.
@@ -57,12 +55,6 @@ private:
 
 // Convenience definitions.
 using LatencyDistribution = Distribution<std::chrono::nanoseconds>;
-
-template <typename T>
-std::ostream &operator<<(std::ostream &os, Distribution<T> &d) {
-  os << d.estimates();
-  return os;
-}
 
 // Defined in stats.cpp.
 double similarity(const folly::QuantileEstimates &a,
