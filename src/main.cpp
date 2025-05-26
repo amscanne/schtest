@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#include <thread>
 
 #include "sched/sched.h"
 #include "util/output.h"
@@ -157,7 +158,7 @@ static Result<ParentContext> spawn(char **argv) {
 const static char *usage =
     R"(schtest <flags> [--] [<binary> [flags...]]
 
-This program drives a series of scheduler tests. It is used to drive simulated 
+This program drives a series of scheduler tests. It is used to drive simulated
 workloads, and assert functional properties of the scheduler, which map to test
 results that are emitted. There are also standardized benchmarks.
 
