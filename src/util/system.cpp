@@ -12,7 +12,7 @@
 
 namespace schtest {
 
-Result<> CPUSet::migrate() const {
+Result<> CPUSet::run(std::function<void()> fn) const {
   cpu_set_t orig;
   cpu_set_t target = mask();
 
@@ -30,6 +30,9 @@ Result<> CPUSet::migrate() const {
   if (rc < 0) {
     return Error("unable to set CPU mask", errno);
   }
+
+  // Run the required function.
+  fn();
 
   // Restore original affinity.
   rc = sched_setaffinity(0, sizeof(cpu_set_t), &orig);

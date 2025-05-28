@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <functional>
 #include <iostream>
 #include <sched.h>
 #include <unistd.h>
@@ -13,10 +14,15 @@ class CPUSet {
 public:
   virtual ~CPUSet() = default;
 
+  // runs the given function on this CPU set.
+  Result<> run(std::function<void()> f) const;
+
   // Migrates to the given CPU set. When this function returns, the processes
   // may no longer be on this CPU set, but they will have been for at least a
   // short period of time.
-  Result<> migrate() const;
+  Result<> migrate() const {
+    return run([]() {});
+  }
 
 protected:
   virtual cpu_set_t mask() const = 0;

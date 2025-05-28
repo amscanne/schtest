@@ -1,3 +1,9 @@
 add_library(workloads
-  workloads.cpp
+  benchmark.cpp
+  context.cpp
+  process.cpp
+  semaphore.cpp
+  socketpair.cpp
+  spinner.cpp
 )
+target_link_libraries(workloads util)

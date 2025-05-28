@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <string>
 
 #include "util/result.h"
 
@@ -12,32 +11,23 @@ namespace schtest {
 // and tears down this cgroup when the object is destroyed.
 class Cgroup {
 public:
-  // Delete copy constructor and assignment operator
+  static Result<Cgroup> create();
+
+  ~Cgroup();
+  Cgroup(Cgroup &&other) = default;
+  Cgroup &operator=(Cgroup &&other) = default;
+
   Cgroup(const Cgroup &) = delete;
   Cgroup &operator=(const Cgroup &) = delete;
 
-  // Move constructor and assignment operator
-  Cgroup(Cgroup &&other) noexcept;
-  Cgroup &operator=(Cgroup &&other) noexcept;
+  const std::filesystem::path &path() const { return path_; }
 
-  // Destructor - tears down the cgroup
-  ~Cgroup();
-
-  // Get the path to the cgroup
-  const std::filesystem::path &path() const;
-
-  // Static factory method to create a new cgroup
-  // Returns Result<Cgroup> to handle errors on the creation path
-  static Result<Cgroup> create(const std::string &name);
+  // Enters the cgroup with the current thread.
+  Result<> enter();
 
 private:
-  // Private constructor - only called by the static factory method
-  explicit Cgroup(std::filesystem::path path);
-
-  // Clean up the cgroup
-  void cleanup();
-
-  std::filesystem::path path_; // Path to the cgroup
+  explicit Cgroup(std::filesystem::path path) : path_(std::move(path)){};
+  std::filesystem::path path_;
 };
 
 } // namespace schtest

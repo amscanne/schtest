@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "sched/sched.h"
+#include "util/child.h"
 #include "util/output.h"
 #include "util/result.h"
 #include "util/user.h"
@@ -15,145 +16,6 @@
 using namespace schtest;
 using namespace schtest::output;
 using namespace schtest::sched;
-
-struct ChildContext {
-  // The notify_fd is the write end of a pipe when the child will ultimately
-  // write the return value for the executed process. If the child is started
-  // successully (on exec), then this will be closed automatically.
-  int notify_fd;
-
-  // These are pointers to the arguments to be passed to the child. These
-  // locations must be valid until `notify_fd` is read above.
-  char **argv;
-};
-
-class ParentContext {
-public:
-  ParentContext(pid_t pid) : child_(pid) {};
-
-  // Determine if the child is still alive.
-  bool alive() {
-    if (!child_) {
-      return false;
-    }
-    int status = 0;
-    pid_t pid = waitpid(*child_, &status, WNOHANG);
-    if ((pid == *child_ && (WIFEXITED(status) || WIFSIGNALED(status)))) {
-      child_.reset();
-      exit_code_ = WIFEXITED(status) ? WEXITSTATUS(status) : -WTERMSIG(status);
-      return false;
-    }
-    return kill(*child_, 0) == 0;
-  }
-
-  // Get the exit code of the child. This is valid only after `alive()` has
-  // returned false at least once.
-  int exit_code() {
-    if (!exit_code_) {
-      return 0;
-    }
-    return exit_code_.value();
-  }
-
-private:
-  std::optional<pid_t> child_;
-  std::optional<int> exit_code_;
-};
-
-static void child(ChildContext *ctx) {
-  // Ensure that we die when the child dies.
-  int rc = prctl(PR_SET_PDEATHSIG, SIGKILL, 0, 0, 0);
-  if (rc < 0) {
-    assert(write(ctx->notify_fd, &rc, sizeof(rc)) == 1);
-    assert(close(ctx->notify_fd) == 0);
-    exit(1);
-  }
-
-  // Spawn the given child process.
-  pid_t child = fork();
-  if (child < 0) {
-    assert(write(ctx->notify_fd, &child, sizeof(child)) == 1);
-    assert(close(ctx->notify_fd) == 0);
-    exit(1);
-  }
-  if (child == 0) {
-    // There is no need to protect with PR_SET_PDEATHSIG here, as the new
-    // init in the namespace will die when the parent dies, and the entire
-    // namespace will be killed. This covers the case when the child here
-    // attempts ot daemonize or anything else like that.
-    rc = execvp(*ctx->argv, ctx->argv);
-    assert(write(ctx->notify_fd, &child, sizeof(child)) == 0);
-    assert(close(ctx->notify_fd) == 0);
-    exit(1);
-  }
-
-  // The child will either write to the notify pipe, or close it. Either
-  // way, we can safely close it here.
-  close(ctx->notify_fd);
-
-  // Reap processes.
-  while (true) {
-    // Wait for anything to exit, it may have been reparented to us.
-    int status;
-    pid_t pid = waitpid(-1, &status, 0);
-
-    // Check to see if it was the original child. If yes, then we will
-    // exit as well to notify the parent that are done.
-    if (pid == child) {
-      if (WIFEXITED(status)) {
-        exit(WEXITSTATUS(status));
-      } else if (WIFSIGNALED(status)) {
-        exit(255);
-      }
-    }
-  }
-}
-
-static Result<ParentContext> spawn(char **argv) {
-  std::cerr << "spawning: " << std::endl;
-  for (int i = 0; argv[i]; i++) {
-    std::cerr << " - " << argv[i] << std::endl;
-  }
-
-  // Create a pipe to notify the parent when the child has been started.
-  int notify_pipe[2];
-  int rc = pipe2(notify_pipe, O_CLOEXEC);
-  if (rc < 0) {
-    return Error("failed to create pipe", errno);
-  }
-  ChildContext ctx = {
-      .notify_fd = notify_pipe[1],
-      .argv = argv,
-  };
-
-  // Clone the child process.
-  pid_t ret = (pid_t)syscall(__NR_clone, SIGCHLD | CLONE_NEWPID, NULL);
-  if (ret < 0) {
-    close(notify_pipe[0]);
-    close(notify_pipe[1]);
-    return Error("failed to clone", errno);
-  }
-  if (ret == 0) {
-    close(notify_pipe[0]);
-    child(&ctx);
-  }
-
-  // Wait for the child to be started.
-  close(notify_pipe[1]);
-  while (true) {
-    int child_rc = 0;
-    rc = read(notify_pipe[0], &child_rc, sizeof(child_rc));
-    if (rc < 0 && errno == EINTR) {
-      continue;
-    }
-    close(notify_pipe[0]);
-    if (rc == 0) {
-      return ParentContext(ret);
-    }
-    assert(child_rc != 0);
-    return Error("failed to start child", child_rc);
-  }
-}
 
 const static char *usage =
     R"(schtest <flags> [--] [<binary> [flags...]]
@@ -193,6 +55,12 @@ int main(int argc, char **argv) {
   }
   gflags::HandleCommandLineHelpFlags();
 
+  // We require root privileges to create cgroups, install the custom scheduler.
+  if (!User::is_root()) {
+    std::cerr << "error: must run as root" << std::endl;
+    return 1;
+  }
+
   // Build our custom google test flags.
   std::vector<std::string> gtest_flags;
   std::vector<const char *> gtest_argv;
@@ -210,14 +78,8 @@ int main(int argc, char **argv) {
   gtest_argv.push_back(nullptr);
   testing::InitGoogleTest(&gtest_argc, const_cast<char **>(gtest_argv.data()));
 
+  std::optional<Child> child_proc; // For lifecycle.
   if (argc > 1) {
-    // We require root privileges to install a custom scheduler.
-    if (!User::is_root()) {
-      std::cerr << "error: must run as root to install a custom scheduler"
-                << std::endl;
-      return 1;
-    }
-
     // If we are spawning a subprocess, check to see that there is no
     // current sched-ext process installed. We will run one safely, and then
     // wait for it to be installed.
@@ -235,7 +97,11 @@ int main(int argc, char **argv) {
 
     // Run the given binary in its own pid namespace, to ensure that it can
     // be fully captured (it may daemonize, etc.).
-    auto child = spawn(argv + 1);
+    std::cerr << "spawning: " << std::endl;
+    for (int i = 1; argv[i]; i++) {
+      std::cerr << " - " << argv[i] << std::endl;
+    }
+    auto child = Child::spawn(argv + 1);
     if (!child) {
       std::cerr << "error: unable to spawn: " << child.takeError() << std::endl;
       return 1;
@@ -265,6 +131,9 @@ int main(int argc, char **argv) {
       // Wait for a while to see if it starts up.
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+
+    // Push the child into the outer scope.
+    child_proc.emplace(std::move(*child));
   }
 
   testing::UnitTest &unit_test = *testing::UnitTest::GetInstance();
@@ -280,5 +149,12 @@ int main(int argc, char **argv) {
   listeners.Append(custom);
 
   // Run all tests.
-  return RUN_ALL_TESTS();
+  int rc = RUN_ALL_TESTS();
+
+  // Kill the scheduler, if there was one running.
+  if (child_proc) {
+    child_proc->kill(SIGKILL);
+  }
+
+  return rc;
 }

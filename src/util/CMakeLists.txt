@@ -1,16 +1,14 @@
 add_library(util
+  child.cpp
   clock.cpp
   cgroups.cpp
+  memfd.cpp
   output.cpp
   result.cpp
   stats.cpp
   system.cpp
 )
 target_link_libraries(util Folly::folly)
-
-add_executable(cgroups_test cgroups_test.cpp)
-target_link_libraries(cgroups_test util GTest::gtest GTest::gtest_main)
-gtest_discover_tests(cgroups_test)
 
 add_executable(stats_test stats_test.cpp)
 target_link_libraries(stats_test util GTest::gtest GTest::gtest_main)

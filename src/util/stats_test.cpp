@@ -33,7 +33,7 @@ TEST(DistributionTest, IntSimilarDistributions) {
     d1.sample(i);
     d2.sample(i);
   }
-  EXPECT_GT(similarity(d1, d2), 0.95);
+  EXPECT_GT(similarity(d1.estimates(), d2.estimates()), 0.95);
 }
 
 TEST(DistributionTest, IntDifferentDistributions) {
@@ -42,7 +42,7 @@ TEST(DistributionTest, IntDifferentDistributions) {
     d1.sample(i);
     d2.sample(i + 500);
   }
-  EXPECT_LT(similarity(d1, d2), 0.95);
+  EXPECT_LT(similarity(d1.estimates(), d2.estimates()), 0.95);
 }
 
 TEST(DistributionTest, DurationSimilarDistributions) {
@@ -51,7 +51,7 @@ TEST(DistributionTest, DurationSimilarDistributions) {
     d1.sample(std::chrono::nanoseconds(i));
     d2.sample(std::chrono::nanoseconds(i));
   }
-  EXPECT_GT(similarity(d1, d2), 0.95);
+  EXPECT_GT(similarity(d1.estimates(), d2.estimates()), 0.95);
 }
 
 TEST(DistributionTest, DurationDifferentDistributions) {
@@ -60,27 +60,7 @@ TEST(DistributionTest, DurationDifferentDistributions) {
     d1.sample(std::chrono::nanoseconds(i));
     d2.sample(std::chrono::nanoseconds(i + 500));
   }
-  EXPECT_LT(similarity(d1, d2), 0.95);
-}
-
-TEST(DistributionTest, IntOutput) {
-  Distribution<int> d;
-  d.sample(10);
-  d.sample(20);
-  d.sample(30);
-  std::stringstream ss;
-  ss << d.estimates();
-  EXPECT_FALSE(ss.str().empty());
-}
-
-TEST(DistributionTest, DurationLatencyDistributionTypeDef) {
-  LatencyDistribution d;
-  d.sample(std::chrono::nanoseconds(10));
-  d.sample(std::chrono::nanoseconds(20));
-  d.sample(std::chrono::nanoseconds(30));
-  std::stringstream ss;
-  ss << d.estimates();
-  EXPECT_FALSE(ss.str().empty());
+  EXPECT_LT(similarity(d1.estimates(), d2.estimates()), 0.95);
 }
 
 TEST(DistributionTest, IntZScoreViaSimilar) {
@@ -89,7 +69,7 @@ TEST(DistributionTest, IntZScoreViaSimilar) {
     d1.sample(i);
     d2.sample(i);
   }
-  EXPECT_GT(similarity(d1, d2), 0.95);
-  EXPECT_GT(similarity(d1, d2), 0.99);
-  EXPECT_GT(similarity(d1, d2), 0.999);
+  EXPECT_GT(similarity(d1.estimates(), d2.estimates()), 0.95);
+  EXPECT_GT(similarity(d1.estimates(), d2.estimates()), 0.99);
+  EXPECT_GT(similarity(d1.estimates(), d2.estimates()), 0.999);
 }

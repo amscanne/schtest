@@ -3,7 +3,7 @@
 #include "util/clock.h"
 #include "util/stats.h"
 
-namespace schtest {
+namespace folly {
 
 std::ostream &operator<<(std::ostream &os,
                          const folly::QuantileEstimates &estimates) {
@@ -11,11 +11,15 @@ std::ostream &operator<<(std::ostream &os,
   for (const auto &q : estimates.quantiles) {
     auto duration = std::chrono::duration<double>(q.second);
     os << "p" << std::setw(4) << std::left << (100 * q.first) << ": "
-       << fmt(duration) << std::endl;
+       << schtest::fmt(duration) << std::endl;
   }
 
   return os;
 }
+
+} // namespace folly
+
+namespace schtest {
 
 static double width(const folly::QuantileEstimates &a, size_t index) {
   double before = 0.0;

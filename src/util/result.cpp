@@ -10,4 +10,9 @@ Error::~Error() {
   }
 }
 
+std::ostream &operator<<(std::ostream &os, const OK &ok) {
+  os << "OK";
+  return os;
+}
+
 } // namespace schtest

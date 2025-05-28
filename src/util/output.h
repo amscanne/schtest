@@ -26,7 +26,7 @@ public:
 
 class Message {
 public:
-  Message(Output &output) : output_(output) {};
+  Message(Output &output) : output_(output){};
   ~Message() {
     std::string line;
     while (std::getline(buffer_, line)) {
