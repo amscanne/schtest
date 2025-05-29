@@ -59,7 +59,7 @@ private:
 double similarity(const folly::QuantileEstimates &a,
                   const folly::QuantileEstimates &b);
 
-// A sampler that can be used for a single element.
+// A reservoir sampler that can be used for a single element.
 //
 // This is a fixed-size structure and therefore it can be embedded safely
 // into shared memory types.
@@ -69,6 +69,12 @@ public:
   void sample(T v) {
     // Record in a ring buffer if we exhaust the limit.
     auto index = index_.fetch_add(1);
+    if (index >= S) {
+      auto r = rand();
+      if (r % index < S) {
+        samples_[r % S] = v;
+      }
+    }
     samples_[index % S] = v;
   }
 
