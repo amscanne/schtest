@@ -1,7 +1,6 @@
 #pragma once
 
 #include "util/memfd.h"
-#include "util/stats.h"
 #include "workloads/atomic.h"
 #include "workloads/process.h"
 #include "workloads/semaphore.h"

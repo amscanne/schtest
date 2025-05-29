@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <folly/stats/QuantileEstimator.h>
+#include <iostream>
 
 namespace schtest {
 
@@ -16,26 +17,55 @@ std::string fmt(const std::chrono::duration<T> &d) {
 class Timer {
 public:
   using clock = std::chrono::steady_clock;
-  Timer() : start_(clock::now()) {}
+  using time_point = std::chrono::time_point<clock, std::chrono::nanoseconds>;
 
-  // resest resets the current timer.
-  inline void reset() { start_ = clock::now(); }
+  Timer() : start_(clock::now()){};
 
-  // elapsed returns the time since the timer was reset.
-  inline std::chrono::nanoseconds elapsed() {
+  // reset resets the current timer.
+  void reset() { start_.store(clock::now()); }
+
+  // returns the time passed since the last reset.
+  std::chrono::nanoseconds elapsed() const {
     auto now = clock::now();
-    if (now < start_) {
-      // If the time is going to go backwards, we just return 0. This
-      // can happen if there is a clock change or skew between CPUs,
-      // (even though it shouldn't, we at least don't explode).
+    auto start = start_.load();
+    if (now < start) {
       return std::chrono::nanoseconds(0);
     }
-    return now - start_;
+    return now - start;
   }
 
 private:
-  using time_point = std::chrono::time_point<clock, std::chrono::nanoseconds>;
-  time_point start_;
+  std::atomic<time_point> start_;
+};
+
+template <size_t S>
+class RobustTimer {
+public:
+  using cookie_t = uint64_t;
+
+  void reset() {
+    auto orig_index = index_.fetch_add(1);
+    timers_[orig_index % S].reset();
+  }
+
+  // Returns a unique cookie that can be used to disambiguate the timer when
+  // it is reset multiple times between calls to `reset` and `elapsed`.
+  cookie_t cookie() { return index_.load(); }
+
+  // Returns the time passed since the last reset prior to the given cookie. If
+  // this is not available, then `std::nullopt` is returned instead.
+  std::optional<std::chrono::nanoseconds> elapsed(cookie_t cookie) const {
+    auto v = timers_[cookie % S].elapsed();
+    if (index_.load() >= cookie + S) {
+      // This is no longer valid.
+      return std::nullopt;
+    }
+    return v;
+  }
+
+private:
+  std::array<Timer, S> timers_ = {};
+  std::atomic<cookie_t> index_ = 0;
 };
 
 }; // namespace schtest

@@ -19,6 +19,9 @@ public:
   Process(const Process &other) = delete;
   ~Process() { join(); };
 
+  // Sets the name of the process, if needed.
+  static void name(const std::string &name);
+
   // Start starts the given process.
   Result<> start();
 

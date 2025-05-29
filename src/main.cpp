@@ -38,7 +38,6 @@ static const char *flags = R"(
 )";
 
 DEFINE_bool(h, false, "show a short help messsage");
-DEFINE_double(min_time, 1.0, "minimum time to run benchmarks");
 DEFINE_string(filter, "",
               "filter to apply to the list of tests and benchmarks");
 DEFINE_bool(list, false, "list all available tests and benchmarks");

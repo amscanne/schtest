@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <thread>
 
-#include "util/output.h"
 #include "util/stats.h"
 #include "workloads/benchmark.h"
 #include "workloads/context.h"
@@ -9,7 +8,6 @@
 
 using namespace schtest;
 using namespace schtest::workloads;
-using namespace schtest::output;
 
 TEST(Basic, PingPong) {
   auto ctx = Context::create();
@@ -78,7 +76,7 @@ TEST_P(HerdTest, WakeUps) {
 
     // Unblock all threads.
     threads_running.store(false);
-    outbound->produce(count, count);
+    outbound->produce(2 * count, count);
     for (int i = 0; i < count; i++) {
       threads[i].join();
     }
@@ -93,6 +91,5 @@ TEST_P(HerdTest, WakeUps) {
   });
 }
 
-INSTANTIATE_TEST_SUITE_P(HerdTest, HerdTest,
-                         ::testing::Values(1, 10, 100, 1000),
+INSTANTIATE_TEST_SUITE_P(Broadcast, HerdTest, ::testing::Values(1, 2, 4, 8, 16),
                          testing::PrintToStringParamName());

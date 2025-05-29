@@ -3,7 +3,6 @@ add_library(workloads
   context.cpp
   process.cpp
   semaphore.cpp
-  socketpair.cpp
   spinner.cpp
 )
-target_link_libraries(workloads util)
+target_link_libraries(workloads gflags util)

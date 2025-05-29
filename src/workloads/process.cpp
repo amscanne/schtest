@@ -1,11 +1,16 @@
+#include <sys/prctl.h>
+
 #include "workloads/process.h"
-#include "util/output.h"
-#include "workloads/context.h"
 
 namespace schtest::workloads {
 
+void Process::name(const std::string &name) {
+  prctl(PR_SET_NAME, name.c_str(), nullptr, nullptr, nullptr);
+}
+
 Result<> Process::start() {
-  // First, create a cgroup which will hold this process.
+  // First, create a cgroup which will hold this process. This may already
+  // exist, in which case we can simply reuse the group.
   if (!cgroup_) {
     auto cg = Cgroup::create();
     if (!cg) {
@@ -42,10 +47,11 @@ Result<> Process::join() {
   if (child_) {
     child_->wait();
     child_.reset();
-    cgroup_.reset();
-    auto r = std::move(final_result_.value());
-    final_result_.reset();
-    return r;
+    if (final_result_.has_value()) {
+      auto r = std::move(final_result_.value());
+      final_result_.reset();
+      return r;
+    }
   }
   return OK();
 }

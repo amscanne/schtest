@@ -40,10 +40,12 @@ private:
   std::atomic<uint32_t> count_ = 0;
   const uint32_t max_;
 
-  // The `wake_` field tracks when the semaphore was notifier (either for
+  // The `wake_` field tracks when the semaphore was notified (either for
   // producer or consumer), and when the thread that was notifier actually
   // starts executing they will generally sample this time.
-  Timer wake_;
+  //
+  // We track the last 16 wakeup times.
+  RobustTimer<16> wake_;
 };
 
 } // namespace schtest::workloads

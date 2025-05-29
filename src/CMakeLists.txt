@@ -11,6 +11,7 @@ target_link_libraries(schtest
   sched
   util
   GTest::gtest
+  gflags
   workloads
 )
 install(TARGETS schtest DESTINATION bin)

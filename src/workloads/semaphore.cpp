@@ -36,10 +36,13 @@ void Semaphore::consume(uint32_t v, uint32_t wake) {
         }
         cur |= consumer_waiter;
       }
+      auto cookie = wake_.cookie();
       int rc =
           syscall(SYS_futex, &count_, FUTEX_WAIT, cur, nullptr, nullptr, 0);
-      if (rc != -EAGAIN) {
-        sample(wake_.elapsed());
+      if (rc == 0) {
+        if (auto v = wake_.elapsed(cookie)) {
+          sample(*v);
+        }
       }
       cur = count_.load(std::memory_order_acquire);
     }
@@ -70,9 +73,12 @@ void Semaphore::produce(uint32_t v, uint32_t wake) {
         }
         cur |= producer_waiter;
       }
+      auto cookie = wake_.cookie();
       int rc = syscall(SYS_futex, &count_, FUTEX_WAIT, 0, nullptr, nullptr, 0);
-      if (rc != -EAGAIN) {
-        sample(wake_.elapsed());
+      if (rc == 0) {
+        if (auto v = wake_.elapsed(cookie)) {
+          sample(*v);
+        }
       }
     }
     cur = count_.load(std::memory_order_acquire);
