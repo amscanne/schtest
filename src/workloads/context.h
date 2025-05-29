@@ -34,8 +34,8 @@ public:
   }
 
   // Adds a process to the given context.
-  void add(std::function<Result<>()> fn) {
-    processes_.emplace_back(allocate<Process>([this, fn]() {
+  Process &add(std::function<Result<>()> fn) {
+    return *processes_.emplace_back(allocate<Process>([this, fn]() {
       wait();
       return fn();
     }));

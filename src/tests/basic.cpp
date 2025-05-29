@@ -2,9 +2,11 @@
 #include <thread>
 
 #include "util/stats.h"
+#include "util/system.h"
 #include "workloads/benchmark.h"
 #include "workloads/context.h"
 #include "workloads/semaphore.h"
+#include "workloads/spinner.h"
 
 using namespace schtest;
 using namespace schtest::workloads;
@@ -37,6 +39,50 @@ TEST(Basic, PingPong) {
     Distribution<std::chrono::nanoseconds> wake_latency;
     sem1->flush(wake_latency);
     sem2->flush(wake_latency);
+    return wake_latency.estimates();
+  });
+}
+
+TEST(Basic, Workers) {
+  auto ctx = Context::create();
+
+  auto system = System::load();
+  ASSERT_TRUE(bool(system)) << system.takeError();
+
+  size_t worker_count = system->logical_cpus();
+  auto *outbound = ctx.allocate<Semaphore>();
+  auto *inbound = ctx.allocate<Semaphore>();
+  ctx.add([&] {
+    std::vector<std::thread> workers;
+    for (size_t i = 0; i < worker_count; i++) {
+      workers.emplace_back([&] {
+        while (ctx.running()) {
+          Spinner work(ctx, std::chrono::microseconds(10));
+          outbound->consume(1);
+          work.spin();
+          inbound->produce(1);
+        }
+      });
+    }
+    // Wake up all threads.
+    outbound->produce(worker_count, worker_count);
+    while (ctx.running()) {
+      inbound->consume(1);
+      outbound->produce(1);
+    }
+    // Wake up anything still blocked.
+    outbound->produce(worker_count, worker_count);
+    for (auto &t : workers) {
+      t.join();
+    }
+    return OK();
+  });
+  benchmark(ctx, [&]() {
+    outbound->reset();
+    inbound->reset();
+    Distribution<std::chrono::nanoseconds> wake_latency;
+    outbound->flush(wake_latency);
+    inbound->flush(wake_latency);
     return wake_latency.estimates();
   });
 }

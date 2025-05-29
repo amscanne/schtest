@@ -4,10 +4,6 @@
 
 namespace schtest::workloads {
 
-void Process::name(const std::string &name) {
-  prctl(PR_SET_NAME, name.c_str(), nullptr, nullptr, nullptr);
-}
-
 Result<> Process::start() {
   // First, create a cgroup which will hold this process. This may already
   // exist, in which case we can simply reuse the group.
@@ -28,6 +24,26 @@ Result<> Process::start() {
       start_.produce(1);
       return;
     }
+
+    // Opt-in to the extensible scheduler class.
+    struct sched_param param = {
+        .sched_priority = priority_,
+    };
+    if (sched_setscheduler(0, 7 /* SCHED_EXT */, &param) < 0) {
+      start_result_.emplace(Error("failed to set scheduler policy", errno));
+      start_.produce(1);
+      return;
+    }
+
+    // Set our process name.
+    if (!name_.empty() &&
+        prctl(PR_SET_NAME, name_.c_str(), nullptr, nullptr, nullptr) < 0) {
+      start_result_.emplace(Error("failed to set process name", errno));
+      start_.produce(1);
+      return;
+    }
+
+    // Run the given function.
     start_result_.emplace(std::move(*result));
     start_.produce(1);
     final_result_.emplace(fn_());

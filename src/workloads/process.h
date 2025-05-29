@@ -19,14 +19,23 @@ public:
   Process(const Process &other) = delete;
   ~Process() { join(); };
 
-  // Sets the name of the process, if needed.
-  static void name(const std::string &name);
-
   // Start starts the given process.
   Result<> start();
 
   // Join waits for the process to exit.
   Result<> join();
+
+  // Sets the priority of the process.
+  Process &set_priority(int priority) {
+    priority_ = priority;
+    return *this;
+  }
+
+  // Sets the name of the process.
+  Process &set_name(const std::string &name) {
+    name_ = name;
+    return *this;
+  }
 
 private:
   template <typename T, typename... R>
@@ -46,6 +55,10 @@ private:
   Semaphore start_;
   std::optional<Result<>> start_result_;
   std::optional<Result<>> final_result_;
+
+  // Settables.
+  int priority_ = 0;
+  std::string name_;
 };
 
 } // namespace schtest::workloads

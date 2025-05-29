@@ -44,8 +44,8 @@ private:
   // producer or consumer), and when the thread that was notifier actually
   // starts executing they will generally sample this time.
   //
-  // We track the last 16 wakeup times.
-  RobustTimer<16> wake_;
+  // We track the last 256 wake-up times.
+  RobustTimer<256> wake_;
 };
 
 } // namespace schtest::workloads

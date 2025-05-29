@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <thread>
 
 #include "util/system.h"
 #include "workloads/benchmark.h"
