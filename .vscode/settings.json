@@ -1,9 +1,0 @@
-{
-    "cmake.buildDirectory": "${workspaceFolder}/build",
-    "clangd.arguments": [
-        "-background-index",
-        "-compile-commands-dir=${workspaceFolder}/build"
-    ],
-    "editor.formatOnSave": true,
-    "C_Cpp.clang_format_style": "file"
-}

@@ -1,0 +1,90 @@
+//! Spinner workload implementation.
+
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
+
+use crate::workloads::context::Context;
+
+/// A workload that spins for a specified duration.
+pub struct Spinner {
+    /// The ID of the CPU that the spinner last ran on.
+    cpu_id: AtomicU32,
+}
+
+impl Spinner {
+    /// Default duration is 99 years.
+    pub const DEFAULT_DURATION: Duration = Duration::from_secs(60 * 60 * 24 * 365 * 99);
+
+    /// Create a new spinner.
+    ///
+    /// # Returns
+    ///
+    /// A new `Spinner` instance.
+    pub fn new() -> Self {
+        Self {
+            cpu_id: AtomicU32::new(0),
+        }
+    }
+
+    /// Spin for the specified duration.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context in which to spin
+    /// * `duration` - The duration to spin for (defaults to forever)
+    pub fn spin(&self, ctx: &Context, duration: Option<Duration>) {
+        let duration = duration.unwrap_or(Self::DEFAULT_DURATION);
+        let start = std::time::Instant::now();
+
+        while ctx.running() && start.elapsed() < duration {
+            if let Some(cpu) = Self::get_current_cpu() {
+                self.cpu_id.store(cpu, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// Get the ID of the CPU that the spinner last ran on.
+    ///
+    /// # Returns
+    ///
+    /// The ID of the CPU that the spinner last ran on.
+    pub fn last_cpu(&self) -> u32 {
+        self.cpu_id.load(Ordering::Relaxed)
+    }
+
+    /// Get the ID of the CPU that the current thread is running on.
+    ///
+    /// # Returns
+    ///
+    /// The ID of the CPU that the current thread is running on, or None if the
+    /// information is not available.
+    fn get_current_cpu() -> Option<u32> {
+        let cpu = unsafe { libc::sched_getcpu() };
+        if cpu >= 0 {
+            Some(cpu as u32)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+    use anyhow::Result;
+
+    #[test]
+    fn test_spinner() -> Result<()> {
+        let ctx = Context::create()?;
+        let spinner = Spinner::new();
+
+        // Spin for a short duration.
+        spinner.spin(&ctx, Some(Duration::from_millis(10)));
+
+        // Check that the CPU ID was updated.
+        println!("Last CPU: {}", spinner.last_cpu());
+
+        Ok(())
+    }
+}

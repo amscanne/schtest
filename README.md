@@ -1,4 +1,4 @@
-# SchTest - Scheduler Testing Framework (Rust Port)
+# schtest - Scheduler Testing Framework
 
 This is a Rust port of the SchTest scheduler testing framework, which provides tools for testing and benchmarking Linux scheduler functionality.
 
