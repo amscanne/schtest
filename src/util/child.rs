@@ -166,7 +166,6 @@ impl Child {
             return false;
         }
 
-        println!("alive");
         // Attempt to reap the child process.
         self.wait(false, false).is_none()
     }
@@ -210,8 +209,6 @@ impl Child {
 
             // Check if something got found.
             if wait_status.is_none() {
-                println!("is none");
-
                 if !block {
                     return None; // Not exited yet and not blocking.
                 }

@@ -1,11 +1,12 @@
 //use hdrhistogram::Histogram;
 //use std::HashMap;
 use crate::workloads::context::Context;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct Test {
     pub name: &'static str,
-    pub test_fn: fn(&mut Context) -> Result<(), String>,
+    pub test_fn: fn(&mut Context) -> Result<()>,
 }
 
 /*
