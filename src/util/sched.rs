@@ -22,10 +22,19 @@ impl Sched {
         let param = libc::sched_param {
             sched_priority: priority,
         };
-        let rc = unsafe { libc::sched_setscheduler(0, policy, &param) };
-        if rc < 0 {
-            let err = std::io::Error::last_os_error();
-            return Err(anyhow!("failed to set scheduler policy: {}", err));
+        let scheduler = SchedExt::installed();
+        if scheduler.is_ok_and(|s| s.is_some()) {
+            let rc = unsafe { libc::sched_setscheduler(0, policy, &param) };
+            if rc < 0 {
+                let err = std::io::Error::last_os_error();
+                return Err(anyhow!("failed to set scheduler policy: {}", err));
+            }
+        } else {
+            let rc = unsafe { libc::sched_setparam(0, &param) };
+            if rc < 0 {
+                let err = std::io::Error::last_os_error();
+                return Err(anyhow!("failed to set scheduler parameters: {}", err));
+            }
         }
         Ok(())
     }

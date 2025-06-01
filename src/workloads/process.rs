@@ -142,14 +142,14 @@ impl Process {
             None,
         )?;
 
-        let proc = Self {
+        let mut proc = Self {
             _cgroup: cgroup,
             child: child,
             start: start,
             ready: ready,
             iters: iters,
         };
-        proc.wait();
+        proc.wait()?;
         Ok(proc)
     }
 
@@ -160,8 +160,19 @@ impl Process {
     }
 
     /// Wait for the process to become ready.
-    pub fn wait(&self) {
-        self.ready.consume(1, 1, None);
+    pub fn wait(&mut self) -> Result<()> {
+        loop {
+            if self
+                .ready
+                .consume(1, 1, Some(std::time::Duration::from_secs(1)))
+            {
+                break;
+            }
+            if !self.child.alive() {
+                return Err(anyhow!("Process exited unexpectedly"));
+            }
+        }
+        Ok(())
     }
 
     /// Join the process.
@@ -185,7 +196,7 @@ impl Drop for Process {
 }
 
 #[allow(unused_macros)]
-macro_rules! create_process {
+macro_rules! process {
     ($ctx:expr, $spec:expr, ($($var:ident),*), $func:expr) => {{
         $(let $var = $var.clone();)*
         unsafe {
@@ -206,7 +217,7 @@ mod tests {
         let iter_count = ctx.allocate(AtomicU32::new(0))?;
         let iter_values = ctx.allocate_vec(2, |_| AtomicU32::new(0))?;
 
-        let mut process = create_process!(
+        let mut process = process!(
             &ctx,
             None,
             (iter_count, iter_values),
@@ -223,13 +234,13 @@ mod tests {
         )?;
 
         process.start(5);
-        process.wait();
+        process.wait()?;
         assert_eq!(iter_count.load(Ordering::SeqCst), 1);
         assert_eq!(iter_values[0].load(Ordering::SeqCst), 5);
         assert_eq!(iter_values[1].load(Ordering::SeqCst), 0);
 
         process.start(10);
-        process.wait();
+        process.wait()?;
         assert_eq!(iter_count.load(Ordering::SeqCst), 2);
         assert_eq!(iter_values[0].load(Ordering::SeqCst), 5);
         assert_eq!(iter_values[1].load(Ordering::SeqCst), 10);
