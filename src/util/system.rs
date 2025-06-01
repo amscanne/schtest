@@ -1,10 +1,10 @@
 //! System topology and affinity utilties.
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::fmt;
 use std::fs;
-use std::path::Path;
 use std::io::Read;
+use std::path::Path;
 
 unsafe fn cpu_set(cpu: usize, set: &mut libc::cpu_set_t) {
     // Calculate which element in the array contains this CPU's bit.
@@ -40,32 +40,44 @@ pub trait CPUSet {
         let target = self.mask();
 
         // Retrieve the current affinity.
-        let rc = unsafe { libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut orig) };
+        let rc = unsafe {
+            libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut orig)
+        };
         if rc < 0 {
-            return Err(anyhow!("unable to get current CPU mask: {}", std::io::Error::last_os_error()));
+            return Err(anyhow!(
+                "unable to get current CPU mask: {}",
+                std::io::Error::last_os_error()
+            ));
         }
 
         // Set new affinity; when this returns, we will be executing on these cores.
-        let rc = unsafe { libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &target) };
+        let rc =
+            unsafe { libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &target) };
         if rc < 0 {
-            return Err(anyhow!("unable to set CPU mask: {}", std::io::Error::last_os_error()));
+            return Err(anyhow!(
+                "unable to set CPU mask: {}",
+                std::io::Error::last_os_error()
+            ));
         }
 
         // Run the required function.
         f();
 
         // Restore original affinity.
-        let rc = unsafe { libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &orig) };
+        let rc =
+            unsafe { libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &orig) };
         if rc < 0 {
-            return Err(anyhow!("unable to restore CPU mask: {}", std::io::Error::last_os_error()));
+            return Err(anyhow!(
+                "unable to restore CPU mask: {}",
+                std::io::Error::last_os_error()
+            ));
         }
 
         Ok(())
     }
 
     // Migrate the current thread to this set.
-    fn migrate(&self) -> Result<()>
-    {
+    fn migrate(&self) -> Result<()> {
         self.run(|| {})
     }
 }
@@ -278,7 +290,10 @@ impl System {
     pub fn current_cpu() -> Result<i32> {
         let cpu = unsafe { libc::sched_getcpu() };
         if cpu < 0 {
-            return Err(anyhow!("failed to get current CPU: {}", std::io::Error::last_os_error()));
+            return Err(anyhow!(
+                "failed to get current CPU: {}",
+                std::io::Error::last_os_error()
+            ));
         }
         Ok(cpu)
     }
@@ -353,7 +368,11 @@ impl System {
             }
         }
 
-        Self { nodes, all_cores, cpu_to_topology }
+        Self {
+            nodes,
+            all_cores,
+            cpu_to_topology,
+        }
     }
 
     /// Get the nodes in the system.
@@ -383,13 +402,18 @@ impl System {
     /// the information could not be loaded.
     pub fn load() -> Result<Self> {
         // Maps to store the topology information
-        let mut topology: std::collections::BTreeMap<i32, std::collections::BTreeMap<i32, std::collections::BTreeMap<i32, Vec<i32>>>> =
-            std::collections::BTreeMap::new();
+        let mut topology: std::collections::BTreeMap<
+            i32,
+            std::collections::BTreeMap<i32, std::collections::BTreeMap<i32, Vec<i32>>>,
+        > = std::collections::BTreeMap::new();
 
         // Get the number of CPUs in the system
         let num_cpus = unsafe { libc::sysconf(libc::_SC_NPROCESSORS_CONF) };
         if num_cpus <= 0 {
-            return Err(anyhow!("failed to get number of CPUs: {}", std::io::Error::last_os_error()));
+            return Err(anyhow!(
+                "failed to get number of CPUs: {}",
+                std::io::Error::last_os_error()
+            ));
         }
 
         // Process each CPU.
@@ -508,7 +532,7 @@ impl CPUSet for System {
 
 impl fmt::Display for System {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "System{{nodes=[", )?;
+        write!(f, "System{{nodes=[",)?;
         for (i, node) in self.nodes.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
@@ -567,7 +591,8 @@ mod tests {
                 // This function should be running on the specified CPU.
                 println!("Running on CPU {}", ht.id());
                 assert_eq!(ht.id(), System::current_cpu().unwrap());
-            }).unwrap();
+            })
+            .unwrap();
         }
     }
 

@@ -4,8 +4,8 @@ use crate::workloads::context::Context;
 
 #[derive(Debug)]
 pub struct Test {
-   pub name: &'static str,
-   pub test_fn: fn(&mut Context) -> Result<(), String>,
+    pub name: &'static str,
+    pub test_fn: fn(&mut Context) -> Result<(), String>,
 }
 
 /*

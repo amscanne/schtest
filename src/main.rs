@@ -1,14 +1,14 @@
-use anyhow::{Result, anyhow, Context};
-use clap::{Parser, ArgAction};
+use anyhow::{anyhow, Context, Result};
+use clap::{ArgAction, Parser};
 use nix::sys::signal::Signal;
 
-use schtest::tests;
 use libtest_with;
+use schtest::tests;
+use schtest::util::child::Child;
+use schtest::util::sched::SchedExt;
 use schtest::util::user::User;
 use schtest::workloads::context::Context as WorkloadContext;
 use std::{thread, time::Duration};
-use schtest::util::sched::SchedExt;
-use schtest::util::child::Child;
 
 /// Command line arguments for the schtest binary
 #[derive(Parser, Debug)]
@@ -46,10 +46,12 @@ struct Args {
 
 fn run(args: Vec<String>) -> Result<Child> {
     // Check if a scheduler is already installed.
-    let scheduler = SchedExt::installed()
-        .with_context(|| "unable to query scheduler")?;
+    let scheduler = SchedExt::installed().with_context(|| "unable to query scheduler")?;
     if scheduler.is_some() {
-        return Err(anyhow!("scheduler already installed: {}", scheduler.unwrap()));
+        return Err(anyhow!(
+            "scheduler already installed: {}",
+            scheduler.unwrap()
+        ));
     }
 
     // Run the given binary safely.
@@ -57,8 +59,7 @@ fn run(args: Vec<String>) -> Result<Child> {
     for arg in &args {
         eprintln!(" - {}", arg);
     }
-    let mut child = Child::spawn(&args)
-        .with_context(|| "unable to spawn child process")?;
+    let mut child = Child::spawn(&args).with_context(|| "unable to spawn child process")?;
 
     // Wait for a custom scheduler to be installed.
     loop {
@@ -68,12 +69,11 @@ fn run(args: Vec<String>) -> Result<Child> {
                 Err(e)
             } else {
                 Err(anyhow!("child exited without installing scheduler"))
-            }
+            };
         }
 
         // If it is installed, we're all set.
-        let scheduler = SchedExt::installed()
-            .with_context(|| "unable to query scheduler")?;
+        let scheduler = SchedExt::installed().with_context(|| "unable to query scheduler")?;
         if let Some(scheduler_name) = scheduler {
             eprintln!("scheduler: {}", scheduler_name);
             return Ok(child);
@@ -107,17 +107,17 @@ fn run_tests(args: &Args) -> libtest_with::Conclusion {
     let mut libtest_tests = Vec::new();
     for t in inventory::iter::<tests::Test> {
         libtest_tests.push(libtest_with::Trial::test(t.name, move || {
-                let mut ctx = WorkloadContext::create()?;
-                (t.test_fn)(&mut ctx)?;
-                Ok(())
-              }));
-    }/*
-    for t in inventory::iters::<tests::Benchmark> {
-        libtest_tests.push(libtest_with::Trial::bench(t.name, move || {
-                (t.bench_fn)(args.min_time)?;
-                Ok(())
-              }));
-    }*/
+            let mut ctx = WorkloadContext::create()?;
+            (t.test_fn)(&mut ctx)?;
+            Ok(())
+        }));
+    } /*
+      for t in inventory::iters::<tests::Benchmark> {
+          libtest_tests.push(libtest_with::Trial::bench(t.name, move || {
+                  (t.bench_fn)(args.min_time)?;
+                  Ok(())
+                }));
+      }*/
     libtest_with::run(&libtest_args, libtest_tests)
 }
 

@@ -1,11 +1,11 @@
 //! Utility functions and types.
 
-pub mod child;
 pub mod cgroups;
+pub mod child;
 pub mod clock;
 pub mod memfd;
-pub mod shared;
 pub mod sched;
+pub mod shared;
 pub mod stats;
 pub mod system;
 pub mod user;

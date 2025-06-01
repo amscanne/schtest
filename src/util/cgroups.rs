@@ -31,12 +31,10 @@ impl CgroupInfo {
     pub fn enter(&self) -> Result<()> {
         // Add the current process to the new cgroup.
         let tasks_path = self.path.join("tasks");
-        let mut tasks_file = File::create(&tasks_path)
-            .context("failed to open tasks file")?;
+        let mut tasks_file = File::create(&tasks_path).context("failed to open tasks file")?;
 
         // Write the current process ID to the tasks file.
-        write!(tasks_file, "{}", process::id())
-            .context("failed to write to tasks file")?;
+        write!(tasks_file, "{}", process::id()).context("failed to write to tasks file")?;
 
         Ok(())
     }
@@ -54,8 +52,8 @@ impl Cgroup {
     /// Creates a new cgroup as a sub-cgroup of the current process.
     pub fn create() -> Result<Self> {
         // Read /proc/self/cgroup to find the current cgroup.
-        let cgroup_file = File::open("/proc/self/cgroup")
-            .context("failed to open /proc/self/cgroup")?;
+        let cgroup_file =
+            File::open("/proc/self/cgroup").context("failed to open /proc/self/cgroup")?;
         let reader = BufReader::new(cgroup_file);
         let mut current_cgroup = None;
 
@@ -68,8 +66,8 @@ impl Cgroup {
                 break;
             }
         }
-        let current_cgroup = current_cgroup
-            .ok_or_else(|| anyhow!("failed to determine current cgroup"))?;
+        let current_cgroup =
+            current_cgroup.ok_or_else(|| anyhow!("failed to determine current cgroup"))?;
 
         // Generate a new unique name, based on a random number.
         let mut rng = rand::thread_rng();
@@ -78,8 +76,7 @@ impl Cgroup {
         // Create the new cgroup path.
         let cgroup_mount = PathBuf::from("/sys/fs/cgroup");
         let new_cgroup_path = cgroup_mount.join(&current_cgroup).join(&name);
-        fs::create_dir_all(&new_cgroup_path)
-            .context("failed to create cgroup directory")?;
+        fs::create_dir_all(&new_cgroup_path).context("failed to create cgroup directory")?;
 
         Ok(Cgroup {
             info: CgroupInfo::new(new_cgroup_path),
@@ -116,8 +113,8 @@ impl Drop for Cgroup {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::user::User;
+    use super::*;
 
     #[test]
     fn test_cgroup_create_and_drop() {

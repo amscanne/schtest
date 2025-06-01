@@ -2,9 +2,9 @@
 
 use std::cmp::PartialOrd;
 use std::fmt;
-use std::time::Duration;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::mem::MaybeUninit;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use rand::Rng;
 use tdigest::TDigest;
@@ -114,7 +114,11 @@ where
     /// The value at the specified percentile, or None if not available.
     pub fn percentile(&self, percentile: f64) -> Option<T> {
         // Find the exact match if it exists.
-        if let Some(q) = self.quantiles.iter().find(|(p, _)| (*p - percentile).abs() < f64::EPSILON) {
+        if let Some(q) = self
+            .quantiles
+            .iter()
+            .find(|(p, _)| (*p - percentile).abs() < f64::EPSILON)
+        {
             return Some(q.1);
         }
 
@@ -169,7 +173,12 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "count: {}", self.count)?;
         for i in 0..self.quantiles.len() - 1 {
-            write!(f, ", p{}: {}", self.quantiles[i].0 * 100.0, self.quantiles[i].1)?;
+            write!(
+                f,
+                ", p{}: {}",
+                self.quantiles[i].0 * 100.0,
+                self.quantiles[i].1
+            )?;
         }
 
         Ok(())
@@ -195,13 +204,9 @@ where
     T: DistributionValue,
 {
     // Convert the quantiles to f64 for comparison.
-    let a_quantiles: Vec<(f64, f64)> = a.quantiles.iter()
-        .map(|&(p, v)| (p, to_f64(v)))
-        .collect();
+    let a_quantiles: Vec<(f64, f64)> = a.quantiles.iter().map(|&(p, v)| (p, to_f64(v))).collect();
 
-    let b_quantiles: Vec<(f64, f64)> = b.quantiles.iter()
-        .map(|&(p, v)| (p, to_f64(v)))
-        .collect();
+    let b_quantiles: Vec<(f64, f64)> = b.quantiles.iter().map(|&(p, v)| (p, to_f64(v))).collect();
 
     // Calculate the distance between the distributions.
     1.0 - distance(&a_quantiles, &b_quantiles)
@@ -407,7 +412,7 @@ where
         let value_f64 = to_f64(value);
         let values = vec![value_f64];
         self.digest = self.digest.merge_unsorted(values);
-   }
+    }
 
     /// Get the statistical estimates of the distribution.
     ///
@@ -476,8 +481,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use more_asserts::{assert_gt, assert_lt};
+    use std::time::Duration;
 
     #[test]
     fn test_distribution_empty() {

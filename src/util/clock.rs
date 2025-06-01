@@ -44,7 +44,10 @@ impl Timer {
     ///
     /// This method can be called from multiple threads safely.
     pub fn reset(&self) {
-        self.start.store(Instant::now().duration_since(self.reference).as_nanos() as u64, Ordering::SeqCst);
+        self.start.store(
+            Instant::now().duration_since(self.reference).as_nanos() as u64,
+            Ordering::SeqCst,
+        );
     }
 }
 
@@ -81,7 +84,9 @@ impl<const S: usize> SplitTimer<S> {
             timers.push(Timer::new());
         }
         Self {
-            timers: timers.try_into().unwrap_or_else(|_| panic!("Failed to create timer array")),
+            timers: timers
+                .try_into()
+                .unwrap_or_else(|_| panic!("Failed to create timer array")),
             index: AtomicU64::new(0),
         }
     }

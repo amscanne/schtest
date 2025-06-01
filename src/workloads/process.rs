@@ -1,13 +1,13 @@
 //! Process management for workloads.
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use anyhow::{anyhow, Result};
-use nix::sys::signal::Signal;
 use libc;
+use nix::sys::signal::Signal;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::util::cgroups::Cgroup;
-use crate::util::sched::Sched;
 use crate::util::child::Child;
+use crate::util::sched::Sched;
 use crate::util::shared::SharedBox;
 use crate::workloads::context::Context;
 use crate::workloads::semaphore::Semaphore;
@@ -28,7 +28,7 @@ impl Spec {
     ///
     /// An empty process spec.
     pub fn new() -> Self {
-        Spec{
+        Spec {
             priority: None,
             name: None,
         }
@@ -76,10 +76,10 @@ pub struct Process {
 
     /// Semaphore for synchronizing start. The number of iterations to run
     /// of the given function is provided as the first argument.
-    start: SharedBox<Semaphore::<0,0>>,
+    start: SharedBox<Semaphore<0, 0>>,
 
     /// Semaphore for synchronizing at the end of an iteration.
-    ready: SharedBox<Semaphore::<0,0>>,
+    ready: SharedBox<Semaphore<0, 0>>,
 
     /// The number of iterations to complete.
     iters: SharedBox<AtomicU32>,
@@ -110,36 +110,37 @@ impl Process {
         let child_start = start.clone();
         let child_ready = ready.clone();
         let child_iters = iters.clone();
-        let child = Child::run(move || {
-            let mut priority = 0;
-            if let Some(spec) = spec {
-                if let Some(p) = spec.priority {
-                    priority = p;
-                }
-                if let Some(name) = spec.name {
-                    let rc = unsafe {
-                        libc::prctl(libc::PR_SET_NAME, name.as_ptr(), 0, 0, 0)
-                    };
-                    if rc < 0 {
-                        let err = std::io::Error::last_os_error();
-                        return Err(anyhow!("failed to set process name: {}", err));
+        let child = Child::run(
+            move || {
+                let mut priority = 0;
+                if let Some(spec) = spec {
+                    if let Some(p) = spec.priority {
+                        priority = p;
+                    }
+                    if let Some(name) = spec.name {
+                        let rc = unsafe { libc::prctl(libc::PR_SET_NAME, name.as_ptr(), 0, 0, 0) };
+                        if rc < 0 {
+                            let err = std::io::Error::last_os_error();
+                            return Err(anyhow!("failed to set process name: {}", err));
+                        }
                     }
                 }
-            }
-            Sched::set_scheduler(7 /* SCHED_EXT */, priority)?;
-            cgroup_info.enter()?;
+                Sched::set_scheduler(7 /* SCHED_EXT */, priority)?;
+                cgroup_info.enter()?;
 
-            // Construct our callback to the iteration function.
-            let get_iters = Box::new(move || {
-                child_ready.produce(1, 1, None);
-                if !child_start.consume(1, 1, None) {
-                    // Since we have no timeout, this should never happen.
-                    panic!("Failed to consume semaphore");
-                }
-                child_iters.swap(0, Ordering::Relaxed)
-            });
-            func(get_iters)
-        }, None)?;
+                // Construct our callback to the iteration function.
+                let get_iters = Box::new(move || {
+                    child_ready.produce(1, 1, None);
+                    if !child_start.consume(1, 1, None) {
+                        // Since we have no timeout, this should never happen.
+                        panic!("Failed to consume semaphore");
+                    }
+                    child_iters.swap(0, Ordering::Relaxed)
+                });
+                func(get_iters)
+            },
+            None,
+        )?;
 
         let proc = Self {
             _cgroup: cgroup,
@@ -205,16 +206,21 @@ mod tests {
         let iter_count = ctx.allocate(AtomicU32::new(0))?;
         let iter_values = ctx.allocate_vec(2, |_| AtomicU32::new(0))?;
 
-        let mut process = create_process!(&ctx, None, (iter_count, iter_values), move |mut get_iters| {
-            loop {
-                let iters = get_iters();
-                let count = iter_count.fetch_add(1, Ordering::SeqCst);
-                iter_values[count as usize].store(iters, Ordering::SeqCst);
-                let iters = get_iters();
-                let count = iter_count.fetch_add(1, Ordering::SeqCst);
-                iter_values[count as usize].store(iters, Ordering::SeqCst);
+        let mut process = create_process!(
+            &ctx,
+            None,
+            (iter_count, iter_values),
+            move |mut get_iters| {
+                loop {
+                    let iters = get_iters();
+                    let count = iter_count.fetch_add(1, Ordering::SeqCst);
+                    iter_values[count as usize].store(iters, Ordering::SeqCst);
+                    let iters = get_iters();
+                    let count = iter_count.fetch_add(1, Ordering::SeqCst);
+                    iter_values[count as usize].store(iters, Ordering::SeqCst);
+                }
             }
-        })?;
+        )?;
 
         process.start(5);
         process.wait();

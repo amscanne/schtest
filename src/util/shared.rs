@@ -2,11 +2,11 @@
 
 use std::alloc::Layout;
 use std::ptr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use crate::util::memfd::MemFd;
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 /// A bump allocator that uses a memfd as backing storage.
 ///
@@ -157,7 +157,6 @@ impl<T> SharedBox<T> {
         })
     }
 
-
     /// Get the raw pointer to the object.
     pub fn as_ptr(&self) -> *const T {
         self.ptr
@@ -208,9 +207,8 @@ impl<T> SharedVec<T> {
     ///
     /// A Result containing the new SharedVec or an Error.
     pub fn with_capacity(allocator: Arc<BumpAllocator>, capacity: usize) -> Result<Self> {
-        let layout = Layout::array::<T>(capacity).map_err(|_| {
-            anyhow!("Failed to create layout for SharedVec")
-        })?;
+        let layout = Layout::array::<T>(capacity)
+            .map_err(|_| anyhow!("Failed to create layout for SharedVec"))?;
         let ptr = unsafe { allocator.alloc(layout) };
         if ptr.is_null() {
             return Err(anyhow!("Failed to allocate memory for SharedVec"));
@@ -245,7 +243,6 @@ impl<T> SharedVec<T> {
         Ok(())
     }
 
-
     /// Get the length of the vector.
     pub fn len(&self) -> usize {
         self.len
@@ -261,7 +258,6 @@ impl<T> SharedVec<T> {
         self.capacity
     }
 
-
     /// Get a reference to the element at the given index.
     ///
     /// # Arguments
@@ -275,9 +271,7 @@ impl<T> SharedVec<T> {
         if index >= self.len {
             None
         } else {
-            unsafe {
-                Some(&*self.ptr.add(index))
-            }
+            unsafe { Some(&*self.ptr.add(index)) }
         }
     }
 
@@ -294,9 +288,7 @@ impl<T> SharedVec<T> {
         if index >= self.len {
             None
         } else {
-            unsafe {
-                Some(&mut *self.ptr.add(index))
-            }
+            unsafe { Some(&mut *self.ptr.add(index)) }
         }
     }
 }
@@ -363,7 +355,6 @@ mod tests {
             assert_eq!(slice2[0], 44);
             assert_eq!(slice2[1], 45);
         }
-
     }
 
     #[test]
@@ -374,7 +365,6 @@ mod tests {
         *box1 = 100;
         assert_eq!(*box1, 100);
     }
-
 
     #[test]
     fn test_shared_vec() {

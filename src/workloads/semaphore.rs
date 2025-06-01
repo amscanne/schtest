@@ -1,13 +1,13 @@
 //! Semaphore implementation.
 
+use libc;
+use std::mem::MaybeUninit;
+use std::os::raw::c_int;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
-use std::os::raw::c_int;
-use std::mem::MaybeUninit;
-use libc;
 
 use crate::util::clock::SplitTimer;
-use crate::util::stats::{ReservoirSampler, Distribution};
+use crate::util::stats::{Distribution, ReservoirSampler};
 
 /// A lock-free semaphore for synchronizing threads.
 pub struct Semaphore<const S: usize = 256, const R: usize = 1024> {
@@ -76,12 +76,11 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
             let has_waiter = (cur & Self::WAITER) == Self::WAITER;
 
             if amount >= v {
-                if self.count.compare_exchange_weak(
-                    cur,
-                    amount - v,
-                    Ordering::AcqRel,
-                    Ordering::Acquire
-                ).is_ok() {
+                if self
+                    .count
+                    .compare_exchange_weak(cur, amount - v, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
                     if has_waiter {
                         self.wake.reset();
                         unsafe {
@@ -92,7 +91,7 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
                                 wake as c_int,
                                 std::ptr::null::<libc::timespec>(),
                                 0,
-                                0
+                                0,
                             );
                         }
                     }
@@ -100,12 +99,16 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
                 }
             } else {
                 if !has_waiter {
-                    if self.count.compare_exchange_weak(
-                        cur,
-                        cur | Self::WAITER,
-                        Ordering::AcqRel,
-                        Ordering::Acquire
-                    ).is_err() {
+                    if self
+                        .count
+                        .compare_exchange_weak(
+                            cur,
+                            cur | Self::WAITER,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        )
+                        .is_err()
+                    {
                         cur = self.count.load(Ordering::Acquire);
                         continue;
                     }
@@ -131,7 +134,7 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
                         cur as c_int,
                         ts_ptr,
                         0,
-                        0
+                        0,
                     )
                 };
 
@@ -174,12 +177,11 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
             if amount + v <= self.max {
                 let has_waiter = (cur & Self::WAITER) == Self::WAITER;
 
-                if self.count.compare_exchange_weak(
-                    cur,
-                    amount + v,
-                    Ordering::AcqRel,
-                    Ordering::Acquire
-                ).is_ok() {
+                if self
+                    .count
+                    .compare_exchange_weak(cur, amount + v, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
                     if has_waiter {
                         self.wake.reset();
                         unsafe {
@@ -190,7 +192,7 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
                                 wake as c_int,
                                 std::ptr::null::<libc::timespec>(),
                                 0,
-                                0
+                                0,
                             );
                         }
                     }
@@ -200,12 +202,16 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
                 let has_waiter = (cur & Self::WAITER) == Self::WAITER;
 
                 if !has_waiter {
-                    if self.count.compare_exchange_weak(
-                        cur,
-                        cur | Self::WAITER,
-                        Ordering::AcqRel,
-                        Ordering::Acquire
-                    ).is_err() {
+                    if self
+                        .count
+                        .compare_exchange_weak(
+                            cur,
+                            cur | Self::WAITER,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        )
+                        .is_err()
+                    {
                         cur = self.count.load(Ordering::Acquire);
                         continue;
                     }
@@ -236,7 +242,7 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
                         cur as c_int,
                         ts_ptr,
                         0,
-                        0
+                        0,
                     )
                 };
 
@@ -256,7 +262,6 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
             cur = self.count.load(Ordering::Acquire);
         }
     }
-
 }
 
 impl<const S: usize> Default for Semaphore<S> {
@@ -282,9 +287,7 @@ mod tests {
     fn test_semaphore_blocking() {
         let sem = Semaphore::<256, 1024>::new(10);
         thread::scope(|s| {
-            let handle = s.spawn(|| {
-                sem.consume(5, 1, None)
-            });
+            let handle = s.spawn(|| sem.consume(5, 1, None));
             assert!(sem.produce(5, 1, None));
             assert!(handle.join().unwrap());
         });

@@ -1,13 +1,13 @@
 //! Memory-backed file descriptor (memfd) implementation.
 
-use std::os::fd::{AsRawFd, RawFd, BorrowedFd};
-use std::num::NonZeroUsize;
 use std::ffi::CString;
 use std::io;
+use std::num::NonZeroUsize;
+use std::os::fd::{AsRawFd, BorrowedFd, RawFd};
 
+use libc::{c_char, c_int, c_uint};
 use nix::sys::mman::{mmap, munmap, MapFlags, ProtFlags};
 use nix::unistd::{close, ftruncate};
-use libc::{c_char, c_int, c_uint};
 
 /// A memory-backed file descriptor (memfd).
 ///
@@ -43,7 +43,12 @@ impl MemFd {
         let rounded_up = (size + page_size - 1) & !(page_size - 1);
 
         // Create a C string for the name.
-        let c_name = CString::new(name).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid memfd name: {}", e)))?;
+        let c_name = CString::new(name).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Invalid memfd name: {}", e),
+            )
+        })?;
 
         // Create the memfd.
         let fd = unsafe { memfd_create(c_name.as_ptr(), 0) };
@@ -54,7 +59,10 @@ impl MemFd {
         // Set the size of the memfd.
         if let Err(e) = ftruncate(unsafe { BorrowedFd::borrow_raw(fd) }, rounded_up as i64) {
             let _ = close(fd);
-            return Err(io::Error::new(io::ErrorKind::Other, format!("Failed to set size: {}", e)));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Failed to set size: {}", e),
+            ));
         }
 
         // Map the memfd into memory
@@ -69,7 +77,10 @@ impl MemFd {
             )
             .map_err(|e| {
                 let _ = close(fd);
-                io::Error::new(io::ErrorKind::Other, format!("Memory mapping failed: {}", e))
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Memory mapping failed: {}", e),
+                )
             })?
         };
 

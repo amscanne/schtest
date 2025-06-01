@@ -19,11 +19,11 @@ use inventory;
 use super::Test;
 
 fn self_test(_ctx: &mut Context) -> Result<(), String> {
-  println!("hello world!");
-  Ok(())
+    println!("hello world!");
+    Ok(())
 }
 
-inventory::submit!(Test{
+inventory::submit!(Test {
     name: "self_test",
     test_fn: self_test,
 });

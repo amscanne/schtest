@@ -1,8 +1,8 @@
 use std::fs;
-use std::path::Path;
 use std::io::Read;
+use std::path::Path;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 
 /// Scheduler utilities for setting process scheduling parameters.
 pub struct Sched;
@@ -22,9 +22,7 @@ impl Sched {
         let param = libc::sched_param {
             sched_priority: priority,
         };
-        let rc = unsafe {
-            libc::sched_setscheduler(0, policy, &param)
-        };
+        let rc = unsafe { libc::sched_setscheduler(0, policy, &param) };
         if rc < 0 {
             let err = std::io::Error::last_os_error();
             return Err(anyhow!("failed to set scheduler policy: {}", err));
@@ -73,10 +71,11 @@ impl SchedExt {
         if !status_path.exists() {
             return Ok(None);
         }
-        let mut status_file = fs::File::open(status_path)
-            .with_context(|| "Failed to open sched_ext status file")?;
+        let mut status_file =
+            fs::File::open(status_path).with_context(|| "Failed to open sched_ext status file")?;
         let mut status_content = String::new();
-        status_file.read_to_string(&mut status_content)
+        status_file
+            .read_to_string(&mut status_content)
             .with_context(|| "Failed to read sched_ext status file")?;
         let status = status_content.trim();
 
@@ -94,10 +93,11 @@ impl SchedExt {
         if !ops_path.exists() {
             return Ok(None);
         }
-        let mut ops_file = fs::File::open(ops_path)
-            .with_context(|| "Failed to open sched_ext ops file")?;
+        let mut ops_file =
+            fs::File::open(ops_path).with_context(|| "Failed to open sched_ext ops file")?;
         let mut ops_content = String::new();
-        ops_file.read_to_string(&mut ops_content)
+        ops_file
+            .read_to_string(&mut ops_content)
             .with_context(|| "Failed to read sched_ext ops file")?;
         let ops = ops_content.trim();
         Ok(Some(ops.to_string()))

@@ -1,14 +1,14 @@
 //! Child process management, including function execution.
 
-use std::os::unix::io::{RawFd};
-use std::ffi::CString;
-use nix::sys::signal::{self, Signal};
-use nix::unistd::Pid;
-use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
-use nix::sched::{CloneFlags};
-use anyhow::{Result, Context, anyhow};
-use libc;
 use crate::util::user::User;
+use anyhow::{anyhow, Context, Result};
+use libc;
+use nix::sched::CloneFlags;
+use nix::sys::signal::{self, Signal};
+use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+use nix::unistd::Pid;
+use std::ffi::CString;
+use std::os::unix::io::RawFd;
 
 /// A wrapper around a notification file descriptor.
 ///
@@ -112,7 +112,15 @@ impl Child {
 
         // Call clone with the given flags.
         let flags = extra_flags.unwrap_or(CloneFlags::empty());
-        let pid = libc::syscall(libc::SYS_clone as i64, libc::SIGCHLD as i32 | flags.bits() as i32, 0, 0, 0, 0, 0) as i32;
+        let pid = libc::syscall(
+            libc::SYS_clone as i64,
+            libc::SIGCHLD as i32 | flags.bits() as i32,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ) as i32;
         if pid == 0 {
             // This is the child process. We run the given function, and serialize
             // the result to the write end of the pipe.
@@ -132,7 +140,10 @@ impl Child {
             std::process::exit(0);
         }
         if pid < 0 {
-            return Err(anyhow!("Failed to clone process: {}", std::io::Error::last_os_error()));
+            return Err(anyhow!(
+                "Failed to clone process: {}",
+                std::io::Error::last_os_error()
+            ));
         }
 
         // This is the parent process. We close the write end of the pipe.
@@ -185,7 +196,11 @@ impl Child {
         loop {
             // Wait for the child process.
             let wait_pid = if all { Pid::from_raw(-1) } else { self.pid };
-            let wait_flags = if block { None } else { Some(WaitPidFlag::WNOHANG) };
+            let wait_flags = if block {
+                None
+            } else {
+                Some(WaitPidFlag::WNOHANG)
+            };
             let wait_status = match waitpid(wait_pid, wait_flags) {
                 Ok(WaitStatus::Exited(pid, code)) => Some((pid, Some(code), None)),
                 Ok(WaitStatus::Signaled(pid, signal, _)) => Some((pid, None, Some(signal))),
@@ -232,9 +247,15 @@ impl Child {
                     Err(anyhow!("Child process error: {}", buffer_str))
                 }
             } else if exit_code.is_some() {
-                Err(anyhow!("Child process exited with code {}", exit_code.unwrap()))
+                Err(anyhow!(
+                    "Child process exited with code {}",
+                    exit_code.unwrap()
+                ))
             } else if signal.is_some() {
-                Err(anyhow!("Child process was killed by signal {}", signal.unwrap()))
+                Err(anyhow!(
+                    "Child process was killed by signal {}",
+                    signal.unwrap()
+                ))
             } else {
                 Err(anyhow!("Child process exited with unknown status"))
             };
@@ -258,8 +279,7 @@ impl Child {
         }
 
         // Send the signal directly.
-        signal::kill(self.pid, signal)
-            .with_context(|| "Failed to kill child process")?;
+        signal::kill(self.pid, signal).with_context(|| "Failed to kill child process")?;
 
         Ok(())
     }
@@ -279,7 +299,8 @@ impl Child {
         }
 
         // Convert args to CStrings.
-        let c_args: Vec<CString> = args.iter()
+        let c_args: Vec<CString> = args
+            .iter()
             .map(|arg| CString::new(arg.as_str()).unwrap())
             .collect();
 
@@ -291,24 +312,30 @@ impl Child {
             CloneFlags::empty()
         };
         unsafe {
-            Self::run(move || {
-                // Set up death signal to ensure child dies when parent dies.
-                if let Err(e) = nix::sys::prctl::set_pdeathsig(Signal::SIGKILL) {
-                    return Err(anyhow!("Failed to set death signal: {}", e));
-                }
-                // Become the repear for any other subprocesses.
-                if let Err(e) = nix::sys::prctl::set_child_subreaper(true) {
-                    return Err(anyhow!("Failed to set child subreaper: {}", e));
-                }
-                let mut child = Self::run(move || {
-                    let result = nix::unistd::execvp(&c_args[0], &c_args);
-                    match result {
-                        Ok(_) => Err(anyhow!("Failed to execute command")),
-                        Err(error) => Err(anyhow!("Failed to exec: {}", error))
+            Self::run(
+                move || {
+                    // Set up death signal to ensure child dies when parent dies.
+                    if let Err(e) = nix::sys::prctl::set_pdeathsig(Signal::SIGKILL) {
+                        return Err(anyhow!("Failed to set death signal: {}", e));
                     }
-                }, None)?;
-                child.wait(true, true).unwrap()
-            }, Some(flags))
+                    // Become the repear for any other subprocesses.
+                    if let Err(e) = nix::sys::prctl::set_child_subreaper(true) {
+                        return Err(anyhow!("Failed to set child subreaper: {}", e));
+                    }
+                    let mut child = Self::run(
+                        move || {
+                            let result = nix::unistd::execvp(&c_args[0], &c_args);
+                            match result {
+                                Ok(_) => Err(anyhow!("Failed to execute command")),
+                                Err(error) => Err(anyhow!("Failed to exec: {}", error)),
+                            }
+                        },
+                        None,
+                    )?;
+                    child.wait(true, true).unwrap()
+                },
+                Some(flags),
+            )
         }
     }
 }
@@ -346,22 +373,14 @@ mod tests {
 
     #[test]
     fn test_run_success() {
-        let mut child = unsafe {
-            Child::run(move || {
-                Ok(())
-            }, None).unwrap()
-        };
+        let mut child = unsafe { Child::run(move || Ok(()), None).unwrap() };
         let result = child.wait(true, false).unwrap();
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_run_error() {
-        let mut child = unsafe {
-            Child::run(move || {
-                Err(anyhow!("Test error"))
-            }, None)
-        }.unwrap();
+        let mut child = unsafe { Child::run(move || Err(anyhow!("Test error")), None) }.unwrap();
 
         let result = child.wait(true, false).unwrap();
         assert!(!result.is_ok());

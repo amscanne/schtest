@@ -30,10 +30,7 @@ impl Context {
     pub fn create() -> Result<Self> {
         let allocator = BumpAllocator::new("context", Self::TOTAL_SIZE)?;
         let running = SharedBox::new(allocator.clone(), AtomicBool::new(false))?;
-        Ok(Self {
-            allocator,
-            running,
-        })
+        Ok(Self { allocator, running })
     }
 
     /// Check if the context is running.
