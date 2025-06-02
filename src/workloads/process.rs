@@ -4,10 +4,11 @@ use anyhow::{anyhow, Result};
 use libc;
 use nix::sys::signal::Signal;
 use std::sync::atomic::{AtomicU32, Ordering};
+use nix::unistd::Pid;
 
 use crate::util::cgroups::Cgroup;
 use crate::util::child::Child;
-use crate::util::sched::Sched;
+use crate::util::sched::{SchedStats, Sched};
 use crate::util::shared::SharedBox;
 use crate::workloads::context::Context;
 use crate::workloads::semaphore::Semaphore;
@@ -60,6 +61,19 @@ impl Spec {
     pub fn with_name(&mut self, name: &str) -> &mut Self {
         self.name = Some(name.to_string());
         self
+    }
+}
+
+/// A handle for a process that is separate from the actual object.
+pub struct ProcessHandle {
+    /// The pid that can fetch stats, etc.
+    pid: Pid,
+}
+
+impl ProcessHandle {
+    /// Return stats for the process.
+    pub fn stats(&self) -> Result<SchedStats> {
+        Sched::get_process_thread_stats(Some(self.pid))
     }
 }
 
@@ -151,6 +165,13 @@ impl Process {
         };
         proc.wait()?;
         Ok(proc)
+    }
+
+    /// Return the handle.
+    pub fn handle(&self) -> ProcessHandle {
+        ProcessHandle {
+            pid: self.child.pid(),
+        }
     }
 
     /// Start the process for the given iterations.

@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Read;
 use std::path::Path;
+use nix::unistd::Pid;
 
 use anyhow::{anyhow, Context, Result};
 
@@ -35,18 +36,18 @@ impl Sched {
     ///
     /// # Arguments
     ///
-    /// * `pid` - Process ID (0 for current process)
-    /// * `tid` - Thread ID (0 for current thread)
+    /// * `pid` - Process ID (None for current process)
+    /// * `tid` - Thread ID (None for current thread)
     ///
     /// # Returns
     ///
     /// A Result containing the scheduler statistics.
-    pub fn get_thread_stats(pid: i32, tid: i32) -> Result<SchedStats> {
-        let pid_val = if pid == 0 { "self".to_string() } else { pid.to_string() };
-        let tid_val = if tid == 0 { "self".to_string() } else { tid.to_string() };
+    pub fn get_thread_stats(pid: Option<Pid>, tid: Option<Pid>) -> Result<SchedStats> {
+        let pid_val = if pid.is_none() { "self".to_string() } else { pid.unwrap().to_string() };
+        let tid_val = if tid.is_none() { "self".to_string() } else { tid.unwrap().to_string() };
 
         // Path to the scheduler stats file.
-        let path = if tid == 0 || tid == pid {
+        let path = if tid.is_none() || tid.unwrap() == pid.unwrap() {
             format!("/proc/{}/sched", pid_val)
         } else {
             format!("/proc/{}/task/{}/sched", pid_val, tid_val)
@@ -159,20 +160,20 @@ impl Sched {
     ///
     /// A Result containing the scheduler statistics.
     pub fn get_current_thread_stats() -> Result<SchedStats> {
-        Self::get_thread_stats(0, 0)
+        Self::get_thread_stats(None, None)
     }
 
     /// Get aggregated scheduler statistics for all threads in a process.
     ///
     /// # Arguments
     ///
-    /// * `pid` - Process ID (0 for current process)
+    /// * `pid` - Process ID (None for current process)
     ///
     /// # Returns
     ///
     /// A Result containing the aggregated scheduler statistics.
-    pub fn get_process_thread_stats(pid: i32) -> Result<SchedStats> {
-        let pid_val = if pid == 0 { "self".to_string() } else { pid.to_string() };
+    pub fn get_process_thread_stats(pid: Option<Pid>) -> Result<SchedStats> {
+        let pid_val = if pid.is_none() { "self".to_string() } else { pid.unwrap().to_string() };
         let task_dir = format!("/proc/{}/task", pid_val);
         let entries = fs::read_dir(&task_dir)
             .with_context(|| format!("Failed to read task directory: {}", task_dir))?;
@@ -185,7 +186,7 @@ impl Sched {
             let tid_str = file_name.to_string_lossy();
 
             if let Ok(tid) = tid_str.parse::<i32>() {
-                if let Ok(stats) = Self::get_thread_stats(pid, tid) {
+                if let Ok(stats) = Self::get_thread_stats(pid, Some(Pid::from_raw(tid))) {
                     aggregated_stats.nr_migrations += stats.nr_migrations;
                     aggregated_stats.nr_failed_migrations += stats.nr_failed_migrations;
                     aggregated_stats.nr_forced_migrations += stats.nr_forced_migrations;

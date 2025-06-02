@@ -155,6 +155,11 @@ impl Child {
         Ok(child)
     }
 
+    /// Return the process ID of the child.
+    pub fn pid(&self) -> Pid {
+        self.pid
+    }
+
     /// Check if the child process is still alive.
     ///
     /// # Returns

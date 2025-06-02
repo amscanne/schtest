@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::util::shared::{BumpAllocator, SharedBox, SharedVec};
-use crate::workloads::process::Process;
+use crate::workloads::process::{Process, ProcessHandle};
 
 /// Whether the context is running.
 #[derive(Clone)]
@@ -57,9 +57,9 @@ impl Context {
     }
 
     /// Adds a process to the context.
-    pub fn add(&mut self, process: Process) -> &Process {
+    pub fn add(&mut self, process: Process) -> ProcessHandle {
         self.processes.push(process);
-        self.processes.last().unwrap()
+        self.processes.last().unwrap().handle()
     }
 
     /// Starts all processes.
