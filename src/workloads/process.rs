@@ -71,6 +71,11 @@ pub struct ProcessHandle {
 }
 
 impl ProcessHandle {
+    /// Return the process pid.
+    pub fn pid(&self) -> i32 {
+        return self.pid.as_raw();
+    }
+
     /// Return stats for the process.
     pub fn stats(&self) -> Result<SchedStats> {
         Sched::get_process_thread_stats(Some(self.pid))
