@@ -40,7 +40,6 @@ macro_rules! benchmark {
                     name: format!("{}/{}", $name, $param),
                     test_fn: |c| $func(c, $param),
                     constraints: $constraints,
-                    benchmark: true,
                 }
             }
         )+
