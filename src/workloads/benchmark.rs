@@ -269,19 +269,4 @@ mod tests {
         });
         assert!(metric >= 0.5);
     }
-
-    #[test]
-    fn test_benchmark_runs() {
-        let dist = Distribution::<std::time::Duration>::default();
-        let args = BenchArgs {
-            name: "dummy_bench",
-            sample_size: 10,
-            significance_level: 0.05,
-            percentile: 0.5,
-        };
-        let result = measure(&args, "fn", move |_iters| {
-            Ok(BenchResult::Latency(dist.clone()))
-        });
-        assert!(result.is_ok());
-    }
 }

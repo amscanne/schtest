@@ -4,10 +4,213 @@ use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
 
+/// Scheduler statistics for a thread.
+#[derive(Debug, Default, Clone)]
+pub struct SchedStats {
+    pub nr_migrations: u64,
+    pub nr_failed_migrations: u64,
+    pub nr_forced_migrations: u64,
+    pub nr_voluntary_switches: u64,
+    pub nr_involuntary_switches: u64,
+    pub nr_switches: u64,
+
+    pub nr_preemptions: u64,
+    pub nr_wakeups: u64,
+    pub nr_wakeups_sync: u64,
+    pub nr_wakeups_migrate: u64,
+    pub nr_wakeups_local: u64,
+    pub nr_wakeups_remote: u64,
+    pub nr_yields: u64,
+
+    pub wait_sum: f64,
+    pub wait_max: f64,
+    pub wait_count: u64,
+}
+
 /// Scheduler utilities for setting process scheduling parameters.
 pub struct Sched;
 
 impl Sched {
+    /// Get scheduler statistics for a specific thread.
+    ///
+    /// # Arguments
+    ///
+    /// * `pid` - Process ID (0 for current process)
+    /// * `tid` - Thread ID (0 for current thread)
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the scheduler statistics.
+    pub fn get_thread_stats(pid: i32, tid: i32) -> Result<SchedStats> {
+        let pid_val = if pid == 0 { "self".to_string() } else { pid.to_string() };
+        let tid_val = if tid == 0 { "self".to_string() } else { tid.to_string() };
+
+        // Path to the scheduler stats file.
+        let path = if tid == 0 || tid == pid {
+            format!("/proc/{}/sched", pid_val)
+        } else {
+            format!("/proc/{}/task/{}/sched", pid_val, tid_val)
+        };
+
+        // Read the scheduler stats for the given pid.
+        let mut file = fs::File::open(&path)
+            .with_context(|| format!("Failed to open scheduler stats file: {}", path))?;
+        let mut content = String::new();
+        file.read_to_string(&mut content)
+            .with_context(|| format!("Failed to read scheduler stats file: {}", path))?;
+
+        let mut stats = SchedStats::default();
+        for line in content.lines() {
+            if let Some(pos) = line.find(':') {
+                let key = line[..pos].trim().to_string();
+                let value = line[pos+1..].trim().to_string();
+                match key.as_str() {
+                    "nr_migrations" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_migrations = val;
+                        }
+                    },
+                    "nr_failed_migrations" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_failed_migrations = val;
+                        }
+                    },
+                    "nr_forced_migrations" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_forced_migrations = val;
+                        }
+                    },
+                    "nr_voluntary_switches" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_voluntary_switches = val;
+                        }
+                    },
+                    "nr_involuntary_switches" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_involuntary_switches = val;
+                        }
+                    },
+                    "nr_switches" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_switches = val;
+                        }
+                    },
+                    "nr_preemptions" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_preemptions = val;
+                        }
+                    },
+                    "nr_wakeups" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_wakeups = val;
+                        }
+                    },
+                    "nr_wakeups_sync" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_wakeups_sync = val;
+                        }
+                    },
+                    "nr_wakeups_migrate" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_wakeups_migrate = val;
+                        }
+                    },
+                    "nr_wakeups_local" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_wakeups_local = val;
+                        }
+                    },
+                    "nr_wakeups_remote" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_wakeups_remote = val;
+                        }
+                    },
+                    "nr_yields" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.nr_yields = val;
+                        }
+                    },
+                    "wait_sum" => {
+                        if let Ok(val) = value.parse::<f64>() {
+                            stats.wait_sum = val;
+                        }
+                    },
+                    "wait_max" => {
+                        if let Ok(val) = value.parse::<f64>() {
+                            stats.wait_max = val;
+                        }
+                    },
+                    "wait_count" => {
+                        if let Ok(val) = value.parse::<u64>() {
+                            stats.wait_count = val;
+                        }
+                    },
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(stats)
+    }
+
+    /// Get scheduler statistics for the current thread.
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the scheduler statistics.
+    pub fn get_current_thread_stats() -> Result<SchedStats> {
+        Self::get_thread_stats(0, 0)
+    }
+
+    /// Get aggregated scheduler statistics for all threads in a process.
+    ///
+    /// # Arguments
+    ///
+    /// * `pid` - Process ID (0 for current process)
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the aggregated scheduler statistics.
+    pub fn get_process_thread_stats(pid: i32) -> Result<SchedStats> {
+        let pid_val = if pid == 0 { "self".to_string() } else { pid.to_string() };
+        let task_dir = format!("/proc/{}/task", pid_val);
+        let entries = fs::read_dir(&task_dir)
+            .with_context(|| format!("Failed to read task directory: {}", task_dir))?;
+
+        // Aggregate from all threads.
+        let mut aggregated_stats = SchedStats::default();
+        for entry in entries {
+            let entry = entry?;
+            let file_name = entry.file_name();
+            let tid_str = file_name.to_string_lossy();
+
+            if let Ok(tid) = tid_str.parse::<i32>() {
+                if let Ok(stats) = Self::get_thread_stats(pid, tid) {
+                    aggregated_stats.nr_migrations += stats.nr_migrations;
+                    aggregated_stats.nr_failed_migrations += stats.nr_failed_migrations;
+                    aggregated_stats.nr_forced_migrations += stats.nr_forced_migrations;
+                    aggregated_stats.nr_voluntary_switches += stats.nr_voluntary_switches;
+                    aggregated_stats.nr_involuntary_switches += stats.nr_involuntary_switches;
+                    aggregated_stats.nr_switches += stats.nr_switches;
+                    aggregated_stats.nr_preemptions += stats.nr_preemptions;
+                    aggregated_stats.nr_wakeups += stats.nr_wakeups;
+                    aggregated_stats.nr_wakeups_sync += stats.nr_wakeups_sync;
+                    aggregated_stats.nr_wakeups_migrate += stats.nr_wakeups_migrate;
+                    aggregated_stats.nr_wakeups_local += stats.nr_wakeups_local;
+                    aggregated_stats.nr_wakeups_remote += stats.nr_wakeups_remote;
+                    aggregated_stats.nr_yields += stats.nr_yields;
+                    aggregated_stats.wait_sum += stats.wait_sum;
+                    aggregated_stats.wait_count += stats.wait_count;
+                    if stats.wait_max > aggregated_stats.wait_max {
+                        aggregated_stats.wait_max = stats.wait_max;
+                    }
+                }
+            }
+        }
+
+        Ok(aggregated_stats)
+    }
+
     /// Set the scheduler policy and priority for the current process.
     ///
     /// # Arguments
@@ -116,6 +319,8 @@ impl SchedExt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_available() {
@@ -125,5 +330,18 @@ mod tests {
     #[test]
     fn test_installed() {
         let _ = SchedExt::installed();
+    }
+
+    #[test]
+    fn test_get_current_thread_stats() -> Result<()> {
+        for _ in 0..5 {
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        let stats = Sched::get_current_thread_stats()?;
+        let total_switches = stats.nr_voluntary_switches + stats.nr_involuntary_switches;
+        assert!(total_switches > 0, "Expected some context switches");
+
+        Ok(())
     }
 }
