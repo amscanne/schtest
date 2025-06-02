@@ -47,7 +47,7 @@ impl SchedExt {
     const SCHED_EXT_PATH: &'static str = "/sys/kernel/sched_ext";
 
     /// Path to the sched_ext status file.
-    const SCHED_EXT_STATUS_PATH: &'static str = "/sys/kernel/sched_ext/status";
+    const SCHED_EXT_STATUS_PATH: &'static str = "/sys/kernel/sched_ext/state";
 
     /// Path to the root ops files.
     const SCHED_EXT_ROOT_OPS_PATH: &'static str = "/sys/kernel/sched_ext/root/ops";

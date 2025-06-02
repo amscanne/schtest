@@ -3,6 +3,7 @@
 pub mod cgroups;
 pub mod child;
 pub mod clock;
+pub mod constraints;
 pub mod memfd;
 pub mod sched;
 pub mod shared;

@@ -200,7 +200,8 @@ macro_rules! process {
     ($ctx:expr, $spec:expr, ($($var:ident),*), $func:expr) => {{
         $(let $var = $var.clone();)*
         unsafe {
-            $crate::workloads::process::Process::create($ctx, $func, $spec)
+            let p = $crate::workloads::process::Process::create($ctx, $func, $spec)?;
+            $ctx.add(p)
         }
     }};
 }
@@ -216,22 +217,21 @@ mod tests {
         let ctx = Context::create()?;
         let iter_count = ctx.allocate(AtomicU32::new(0))?;
         let iter_values = ctx.allocate_vec(2, |_| AtomicU32::new(0))?;
-
-        let mut process = process!(
+        let iter_count_clone = iter_count.clone();
+        let iter_values_clone = iter_values.clone();
+        let mut process = unsafe { Process::create(
             &ctx,
-            None,
-            (iter_count, iter_values),
             move |mut get_iters| {
                 loop {
                     let iters = get_iters();
-                    let count = iter_count.fetch_add(1, Ordering::SeqCst);
-                    iter_values[count as usize].store(iters, Ordering::SeqCst);
+                    let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
+                    iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
                     let iters = get_iters();
-                    let count = iter_count.fetch_add(1, Ordering::SeqCst);
-                    iter_values[count as usize].store(iters, Ordering::SeqCst);
+                    let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
+                    iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
                 }
-            }
-        )?;
+            }, None
+        )? };
 
         process.start(5);
         process.wait()?;

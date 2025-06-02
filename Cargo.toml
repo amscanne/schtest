@@ -23,9 +23,9 @@ inventory = "0.3"
 libtest-with = "0.8.1-6"
 tdigest = "0.2.3"
 more-asserts = "0.3"
+criterion = "0.5"
 
 [dev-dependencies]
-criterion = "0.5"
 rstest = "0.18"
 
 [lib]

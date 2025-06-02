@@ -3,8 +3,6 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use crate::workloads::context::Context;
-
 /// A workload that spins for a specified duration.
 pub struct Spinner {
     /// The ID of the CPU that the spinner last ran on.
@@ -30,13 +28,12 @@ impl Spinner {
     ///
     /// # Arguments
     ///
-    /// * `ctx` - The context in which to spin
-    /// * `duration` - The duration to spin for (defaults to forever)
-    pub fn spin(&self, ctx: &Context, duration: Option<Duration>) {
-        let duration = duration.unwrap_or(Self::DEFAULT_DURATION);
+    /// * `duration` - The duration to spin for
+    pub fn spin(&self, duration: Duration) {
         let start = std::time::Instant::now();
 
-        while ctx.running() && start.elapsed() < duration {
+        while start.elapsed() < duration {
+            std::sync::atomic::compiler_fence(Ordering::SeqCst);
             if let Some(cpu) = Self::get_current_cpu() {
                 self.cpu_id.store(cpu, Ordering::Relaxed);
             }
@@ -76,11 +73,10 @@ mod tests {
 
     #[test]
     fn test_spinner() -> Result<()> {
-        let ctx = Context::create()?;
         let spinner = Spinner::new();
 
         // Spin for a short duration.
-        spinner.spin(&ctx, Some(Duration::from_millis(10)));
+        spinner.spin(Duration::from_millis(10));
 
         // Check that the CPU ID was updated.
         println!("Last CPU: {}", spinner.last_cpu());

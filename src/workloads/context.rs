@@ -1,11 +1,29 @@
 //! Context for running workloads.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-
 use anyhow::Result;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::util::shared::{BumpAllocator, SharedBox, SharedVec};
+use crate::workloads::process::Process;
+
+/// Whether the context is running.
+#[derive(Clone)]
+pub struct Running {
+    data: SharedBox<AtomicBool>,
+}
+
+impl Running {
+    pub fn running(&self) -> bool {
+        return self.data.load(Ordering::Relaxed);
+    }
+    pub fn start(&self) {
+        self.data.store(true, Ordering::Relaxed);
+    }
+    pub fn stop(&self) {
+        self.data.store(false, Ordering::Relaxed);
+    }
+}
 
 /// A context for running workloads.
 ///
@@ -15,7 +33,10 @@ pub struct Context {
     allocator: Arc<BumpAllocator>,
 
     /// Whether the context is running.
-    running: SharedBox<AtomicBool>,
+    running: Running,
+
+    // All registered processes.
+    processes: Vec<Process>,
 }
 
 impl Context {
@@ -29,36 +50,45 @@ impl Context {
     /// A new `Context` instance.
     pub fn create() -> Result<Self> {
         let allocator = BumpAllocator::new("context", Self::TOTAL_SIZE)?;
-        let running = SharedBox::new(allocator.clone(), AtomicBool::new(false))?;
-        Ok(Self { allocator, running })
+        let running = Running{
+            data: SharedBox::new(allocator.clone(), AtomicBool::new(false))?,
+        };
+        Ok(Self { allocator, running, processes: vec![] })
     }
 
-    /// Check if the context is running.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the context is running, `false` otherwise.
-    pub fn running(&self) -> bool {
-        self.running.load(Ordering::Relaxed)
+    /// Adds a process to the context.
+    pub fn add(&mut self, process: Process) -> &Process {
+        self.processes.push(process);
+        self.processes.last().unwrap()
     }
 
-    /// Stop the context.
-    ///
-    /// This will cause all threads to exit and all resources to be freed.
-    pub fn stop(&self) {
-        self.running.store(false, Ordering::Relaxed);
+    /// Starts all processes.
+    pub fn start(&mut self, iters: u32) {
+        self.running.start();
+        for p in self.processes.iter_mut() {
+            p.start(iters);
+        }
     }
 
-    /// Add a function to be executed in a new process.
+    /// Waits for all processes.
     ///
-    /// # Arguments
-    ///
-    /// * `f` - The function to execute
-    pub fn add<F>(&self, _f: F) -> Result<()>
-    where
-        F: FnOnce() -> Result<()> + Send + 'static,
-    {
-        // Implementation is empty, but we need to return a Result
+    /// Note that after at least one process is stopped, the running flag will be set to
+    /// false. Therefore, ensure that processes are added in a well-defined order: the
+    /// should always use iters directly, while others are permitted to spin until the
+    /// running flag returns false.
+    pub fn wait(&mut self) -> Result<()> {
+        for p in self.processes.iter_mut() {
+            p.wait()?;
+            self.running.stop(); // See above.
+        }
+        self.running.stop();
+        Ok(())
+    }
+
+    /// Runs the given number of iterations.
+    pub fn run(&mut self, iters: u32) -> Result<()> {
+        self.start(iters);
+        self.wait()?;
         Ok(())
     }
 

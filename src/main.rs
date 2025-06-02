@@ -1,16 +1,15 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{ArgAction, Parser};
-use nix::sys::signal::Signal;
 
 use libtest_with;
-use schtest::tests;
+use schtest::cases;
+use schtest::util::constraints::Constraints;
 use schtest::util::child::Child;
 use schtest::util::sched::SchedExt;
 use schtest::util::user::User;
-use schtest::workloads::context::Context as WorkloadContext;
 use std::{thread, time::Duration};
 
-/// Command line arguments for the schtest binary
+/// Command line arguments for the schtest binary.
 #[derive(Parser, Debug)]
 #[command(
     name = "schtest",
@@ -35,13 +34,21 @@ struct Args {
     #[arg(long, action = ArgAction::SetTrue)]
     benchmarks: bool,
 
-    /// Minimum time to run benchmarks.
-    #[arg(long, default_value_t = 1.0)]
-    min_time: f64,
-
     /// Binary to run (with optional arguments).
     #[arg(trailing_var_arg = true)]
     binary: Vec<String>,
+
+    /// Sample size for benchmarks.
+    #[arg(long, default_value_t = 10)]
+    sample_size: usize,
+
+    /// Significance level for benchmarks.
+    #[arg(long, default_value_t = 0.05)]
+    significance_level: f64,
+
+    /// Percentile for benchmarks.
+    #[arg(long, default_value_t = 0.50)]
+    percentile: f64,
 }
 
 fn run(args: Vec<String>) -> Result<Child> {
@@ -82,6 +89,29 @@ fn run(args: Vec<String>) -> Result<Child> {
         // Wait for a while to see if it starts up.
         thread::sleep(Duration::from_millis(10));
     }
+
+}
+
+fn make_trial<F>(
+    name: &'static str,
+    constraints: &Option<Constraints>,
+    test_fn: F,
+) -> libtest_with::Trial
+where
+    F: FnOnce() -> Result<(), libtest_with::Failed> + Send + 'static,
+{
+    let err = if let Some(constraints) = constraints {
+        constraints.check()
+    } else {
+        Ok(())
+    };
+    let ignore = !err.is_ok();
+    let ignore_reason: Option<String> = if ignore {
+        Some(err.unwrap_err().to_string())
+    } else {
+        None
+    };
+    libtest_with::Trial::test(name, test_fn).with_ignored_flag(ignore, ignore_reason)
 }
 
 /// Run all registered tests.
@@ -89,8 +119,8 @@ fn run_tests(args: &Args) -> libtest_with::Conclusion {
     let libtest_args = libtest_with::Arguments {
         include_ignored: false,
         ignored: false,
-        test: !args.benchmarks,
-        bench: args.benchmarks,
+        test: true,
+        bench: false,
         list: args.list,
         nocapture: false,
         show_output: true,
@@ -105,19 +135,27 @@ fn run_tests(args: &Args) -> libtest_with::Conclusion {
         filter: args.filter.clone(),
     };
     let mut libtest_tests = Vec::new();
-    for t in inventory::iter::<tests::Test> {
-        libtest_tests.push(libtest_with::Trial::test(t.name, move || {
-            let mut ctx = WorkloadContext::create()?;
-            (t.test_fn)(&mut ctx)?;
-            Ok(())
-        }));
-    } /*
-      for t in inventory::iters::<tests::Benchmark> {
-          libtest_tests.push(libtest_with::Trial::bench(t.name, move || {
-                  (t.bench_fn)(args.min_time)?;
-                  Ok(())
-                }));
-      }*/
+    if args.benchmarks {
+        use schtest::workloads::benchmark::BenchArgs;
+        for t in inventory::iter::<cases::Benchmark> {
+            #[allow(clippy::redundant_field_names)]
+            let bench_args = BenchArgs {
+                name: t.name,
+                sample_size: args.sample_size,
+                significance_level: args.significance_level,
+                percentile: args.percentile,
+            };
+            libtest_tests.push(make_trial(t.name, &t.constraints, move || {
+                (t.test_fn)(&bench_args).map_err(|e| libtest_with::Failed::from(e.to_string()))
+            }));
+        }
+    } else {
+        for t in inventory::iter::<cases::Test> {
+            libtest_tests.push(make_trial(t.name, &t.constraints, || {
+                (t.test_fn)().map_err(|e| libtest_with::Failed::from(e.to_string()))
+            }));
+        }
+    }
     libtest_with::run(&libtest_args, libtest_tests)
 }
 
@@ -141,12 +179,7 @@ fn main() -> Result<()> {
     let test_result = run_tests(&args);
 
     // Kill the scheduler, if there was one running.
-    if let Some(mut child) = maybe_child {
-        child.kill(Signal::SIGKILL)?;
-        if let Some(result) = child.wait(true, true) {
-            result?;
-        }
-    }
+    drop(maybe_child);
 
     // Return the test result.
     test_result.exit()

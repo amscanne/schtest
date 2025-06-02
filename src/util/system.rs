@@ -76,7 +76,7 @@ pub trait CPUSet {
         Ok(())
     }
 
-    // Migrate the current thread to this set.
+    /// Migrate the current thread to this set.
     fn migrate(&self) -> Result<()> {
         self.run(|| {})
     }
@@ -386,12 +386,17 @@ impl System {
     }
 
     /// Get the number of logical CPUs in the system.
-    pub fn logical_cpus(&self) -> i32 {
+    pub fn logical_cpus(&self) -> usize {
         let mut count = 0;
         for core in &self.all_cores {
-            count += core.hyperthreads().len() as i32;
+            count += core.hyperthreads().len();
         }
         count
+    }
+
+    // Get the number of core complexes in the system.
+    pub fn complexes(&self) -> usize {
+        self.nodes.iter().map(|n| n.complexes.len()).sum()
     }
 
     /// Load system information.

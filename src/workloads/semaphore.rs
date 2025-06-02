@@ -50,7 +50,7 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
     /// # Arguments
     ///
     /// * `dist` - The distribution to add the data to
-    pub fn collect_wake_stats(&mut self, dist: &mut Distribution<Duration>) {
+    pub fn collect_wake_stats(&self, dist: &mut Distribution<Duration>) {
         dist.add_all(&self.reservoir);
         self.reservoir.reset();
     }
