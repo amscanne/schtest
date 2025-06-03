@@ -1,18 +1,19 @@
 //! Tests for system topology behavior.
 
 use std::collections::HashMap;
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 use anyhow::Result;
 
 use crate::test;
 use crate::util::system::{CPUSet, System};
 use crate::workloads::context::Context;
+use crate::workloads::semaphore::Semaphore;
 use crate::workloads::spinner::Spinner;
 
-use crate::process;
 use crate::converge;
+use crate::process;
 
 /// Test that verifies the scheduler spreads threads across physical cores.
 ///
@@ -99,4 +100,108 @@ fn spread_out() -> Result<()> {
     }
 }
 
-test!("spread_out", spread_out, None);
+test!("spread_out", spread_out);
+
+/// Test that coming together for related processes.
+fn come_together() -> Result<()> {
+    let mut ctx = Context::create()?;
+    let system = System::load()?;
+    let complexes = system.complexes();
+    let cores = system.cores().len();
+
+    let mut logical_to_physical = HashMap::new();
+    for node in system.nodes() {
+        for complex in node.complexes() {
+            for core in complex.cores() {
+                for hyperthread in core.hyperthreads() {
+                    logical_to_physical.insert(hyperthread.id(), complex.id());
+                }
+            }
+        }
+    }
+
+    // This will be a very, very busy system. For each process, we will create
+    // N threads (one for each logical core), and they will all try to spin. We
+    // will then measure the number of spinners for which we can observe across
+    // multiple CCXs.
+    let mut spinners = Vec::new();
+    for _ in 0..complexes {
+        let mut proc_spinners = Vec::new();
+        for _ in 0..cores {
+            let spinner = ctx.allocate(Spinner::new())?;
+            proc_spinners.push(spinner);
+        }
+        let wakeup = ctx.allocate(Semaphore::<0, 0>::new(cores as u32))?;
+        process!(&mut ctx, None, (proc_spinners), move |mut get_iters| {
+            // Start `cores` different threads, each spinning on
+            // proc_spinning[i] independently.
+            std::thread::scope(|s| {
+                for spinner in proc_spinners.iter() {
+                    let spinner_clone = spinner.clone();
+                    s.spawn(move || loop {
+                        spinner_clone.spin(Duration::from_millis(1));
+                    });
+                }
+                loop {
+                    let iters = get_iters();
+                    wakeup.produce(iters, iters, None);
+                }
+            });
+            Ok(())
+        });
+        spinners.push(proc_spinners);
+    }
+
+    // Define our metric: the percentage of physical cores that are covered by
+    // our spinners after each execution (each one spun for N milliseconds).
+    //
+    // Note that we tolerant multiple processes on the same CCX, but we don't
+    // tolerate multiple spinners spanning multiple CCXs.
+    let metric = move |iters| {
+        ctx.start(iters);
+        let mut mismatches = 0;
+        let mut total = 0;
+        // See above; same logic applies here.
+        for _ in 0..iters / 10 {
+            thread::sleep(Duration::from_millis(10));
+            for spinner_set in &spinners {
+                let mut complex = None;
+                for spinner in spinner_set {
+                    let cpu = spinner.last_cpu() as i32;
+                    let local_complex = logical_to_physical[&cpu];
+                    if complex.is_none() {
+                        complex = Some(local_complex);
+                    } else if complex.unwrap() != local_complex {
+                        mismatches += 1;
+                    }
+                    total += 1;
+                }
+            }
+        }
+        ctx.wait()?;
+        Ok(1.0 - (mismatches as f64 / total as f64))
+    };
+
+    let target = 0.95; // 95% of cores used.
+    let final_value = converge!((1.0, 30.0), target, metric);
+    if final_value < target {
+        Err(anyhow::anyhow!(
+            "Failed to achieve target: got {:.2}, expected {:.2}",
+            final_value,
+            target
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn needs_numa_or_complexes() -> Result<()> {
+    let system = System::load()?;
+    if system.nodes().len() > 1 || system.nodes()[0].complexes().len() > 1 {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("test requires multiple nodes or complexes"))
+    }
+}
+
+test!("come_together", come_together, needs_numa_or_complexes);

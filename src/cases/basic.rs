@@ -31,7 +31,7 @@ fn self_test() -> Result<()> {
     Ok(())
 }
 
-test!("self_test", self_test, None);
+test!("self_test", self_test);
 
 fn self_bench(args: &BenchArgs) -> Result<()> {
     let mut ctx = Context::create()?;
@@ -42,7 +42,7 @@ fn self_bench(args: &BenchArgs) -> Result<()> {
     })
 }
 
-benchmark!("self_bench", self_bench, (), None);
+benchmark!("self_bench", self_bench, ());
 
 fn ping_pong(args: &BenchArgs) -> Result<()> {
     let mut ctx = Context::create()?;
@@ -75,4 +75,4 @@ fn ping_pong(args: &BenchArgs) -> Result<()> {
     })
 }
 
-benchmark!("ping_pong", ping_pong, (), None);
+benchmark!("ping_pong", ping_pong, ());

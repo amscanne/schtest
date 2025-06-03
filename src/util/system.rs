@@ -236,7 +236,7 @@ impl Node {
     }
 
     /// Get the core complexes belonging to this node.
-    pub fn complexes(&self) -> &[CoreComplex] {
+    pub fn complexes(&self) -> &Vec<CoreComplex> {
         &self.complexes
     }
 
@@ -376,12 +376,12 @@ impl System {
     }
 
     /// Get the nodes in the system.
-    pub fn nodes(&self) -> &[Node] {
+    pub fn nodes(&self) -> &Vec<Node> {
         &self.nodes
     }
 
     /// Get all cores in the system.
-    pub fn cores(&self) -> &[Core] {
+    pub fn cores(&self) -> &Vec<Core> {
         &self.all_cores
     }
 

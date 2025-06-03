@@ -3,7 +3,6 @@ use clap::{ArgAction, Parser};
 
 use libtest_with;
 use schtest::cases;
-use schtest::util::constraints::Constraints;
 use schtest::util::child::Child;
 use schtest::util::sched::SchedExt;
 use schtest::util::user::User;
@@ -89,22 +88,14 @@ fn run(args: Vec<String>) -> Result<Child> {
         // Wait for a while to see if it starts up.
         thread::sleep(Duration::from_millis(10));
     }
-
 }
 
-fn make_trial<F>(
-    name: &'static str,
-    constraints: &Option<Constraints>,
-    test_fn: F,
-) -> libtest_with::Trial
+fn make_trial<F, C>(name: &'static str, test_fn: F, mut constraints: C) -> libtest_with::Trial
 where
     F: FnOnce() -> Result<(), libtest_with::Failed> + Send + 'static,
+    C: FnMut() -> Result<()> + 'static,
 {
-    let err = if let Some(constraints) = constraints {
-        constraints.check()
-    } else {
-        Ok(())
-    };
+    let err = constraints();
     let ignore = !err.is_ok();
     let ignore_reason: Option<String> = if ignore {
         Some(err.unwrap_err().to_string())
@@ -145,15 +136,21 @@ fn run_tests(args: &Args) -> libtest_with::Conclusion {
                 significance_level: args.significance_level,
                 percentile: args.percentile,
             };
-            libtest_tests.push(make_trial(t.name, &t.constraints, move || {
-                (t.test_fn)(&bench_args).map_err(|e| libtest_with::Failed::from(e.to_string()))
-            }));
+            libtest_tests.push(make_trial(
+                t.name,
+                move || {
+                    (t.test_fn)(&bench_args).map_err(|e| libtest_with::Failed::from(e.to_string()))
+                },
+                t.constraints,
+            ));
         }
     } else {
         for t in inventory::iter::<cases::Test> {
-            libtest_tests.push(make_trial(t.name, &t.constraints, || {
-                (t.test_fn)().map_err(|e| libtest_with::Failed::from(e.to_string()))
-            }));
+            libtest_tests.push(make_trial(
+                t.name,
+                || (t.test_fn)().map_err(|e| libtest_with::Failed::from(e.to_string())),
+                t.constraints,
+            ));
         }
     }
     libtest_with::run(&libtest_args, libtest_tests)
