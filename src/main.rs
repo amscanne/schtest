@@ -97,7 +97,7 @@ where
     C: FnMut() -> Result<()> + 'static,
 {
     let err = constraints();
-    let ignore = !err.is_ok();
+    let ignore = err.is_err();
     let ignore_reason: Option<String> = if ignore {
         Some(err.unwrap_err().to_string())
     } else {
