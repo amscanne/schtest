@@ -3,11 +3,14 @@
 //! This module provides utilities for benchmarking workloads and measuring
 //! performance metrics.
 
-use std::time::{Duration, Instant};
-
-use crate::util::stats::Distribution;
 use anyhow::Result;
 use criterion::{Criterion, SamplingMode, Throughput};
+use std::{
+    io::{self, Write},
+    time::{Duration, Instant},
+};
+
+use crate::util::stats::Distribution;
 
 /// Represents the result of a benchmark measurement.
 pub enum BenchResult {
@@ -64,13 +67,23 @@ where
     let threshold = threshold.unwrap_or(0.95);
 
     eprintln!("");
-    eprintln!("converge: min_time={:.2}, max_time={:.2}, threshold={:.2}", min_time.as_secs_f64(), max_time.as_secs_f64(), threshold);
+    eprintln!(
+        "converge: min_time={:.2}, max_time={:.2}, threshold={:.2}",
+        min_time.as_secs_f64(),
+        max_time.as_secs_f64(),
+        threshold
+    );
     let mut iters = 1u32;
     loop {
         let iter_start = Instant::now();
         let metric = measure(iters)?;
         let elapsed = iter_start.elapsed();
-        eprintln!("converge: iters={:}, elapsed={:.2}, metric={:.2}", iters, elapsed.as_secs_f64(), metric);
+        eprintln!(
+            "converge: iters={:}, elapsed={:.2}, metric={:.2}",
+            iters,
+            elapsed.as_secs_f64(),
+            metric
+        );
         if metric >= threshold && elapsed >= min_time {
             return Ok(metric);
         }
@@ -138,18 +151,20 @@ where
                         Err(e) => panic!("Benchmark failed: {:?}", e),
                     };
                     if let BenchResult::Latency(dist) = result {
-                        let latency =
-                            dist.estimates()
-                                .percentile(args.percentile)
-                                .unwrap_or(Duration::ZERO)
-                                .as_secs_f64();
-                        eprintln!("p{} latency: {:?}", (args.percentile * 100.0) as u32, Duration::from_secs_f64(latency));
+                        let est = dist.estimates();
+                        let s = est.visualize(None);
+                        eprintln!("{}", s);
+                        let latency = est
+                            .percentile(args.percentile)
+                            .unwrap_or(Duration::ZERO)
+                            .as_secs_f64();
                         Duration::from_secs_f64(latency * (iters as f64))
                     } else {
                         Duration::ZERO
                     }
                 })
             });
+            eprintln!("");
             group.finish();
         }
         Ok(BenchResult::Count(_)) => {
@@ -170,6 +185,7 @@ where
                         let mut lock = last_throughput_clone.lock().unwrap();
                         let val = v.clone();
                         eprintln!("throughput: {}/s", val as f64 / elapsed.as_secs_f64());
+                        io::stderr().flush().unwrap();
                         *lock = Some(val);
                     }
                     elapsed

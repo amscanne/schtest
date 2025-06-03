@@ -3,12 +3,12 @@
 use anyhow::{anyhow, Result};
 use libc;
 use nix::sys::signal::Signal;
-use std::sync::atomic::{AtomicU32, Ordering};
 use nix::unistd::Pid;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::util::cgroups::Cgroup;
 use crate::util::child::Child;
-use crate::util::sched::{SchedStats, Sched};
+use crate::util::sched::{Sched, SchedStats};
 use crate::util::shared::SharedBox;
 use crate::workloads::context::Context;
 use crate::workloads::semaphore::Semaphore;
@@ -245,19 +245,20 @@ mod tests {
         let iter_values = ctx.allocate_vec(2, |_| AtomicU32::new(0))?;
         let iter_count_clone = iter_count.clone();
         let iter_values_clone = iter_values.clone();
-        let mut process = unsafe { Process::create(
-            &ctx,
-            move |mut get_iters| {
-                loop {
+        let mut process = unsafe {
+            Process::create(
+                &ctx,
+                move |mut get_iters| loop {
                     let iters = get_iters();
                     let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
                     iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
                     let iters = get_iters();
                     let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
                     iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
-                }
-            }, None
-        )? };
+                },
+                None,
+            )?
+        };
 
         process.start(5);
         process.wait()?;

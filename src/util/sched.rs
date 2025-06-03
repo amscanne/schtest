@@ -1,7 +1,7 @@
+use nix::unistd::Pid;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
-use nix::unistd::Pid;
 
 use anyhow::{anyhow, Context, Result};
 
@@ -43,8 +43,16 @@ impl Sched {
     ///
     /// A Result containing the scheduler statistics.
     pub fn get_thread_stats(pid: Option<Pid>, tid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if pid.is_none() { "self".to_string() } else { pid.unwrap().to_string() };
-        let tid_val = if tid.is_none() { "self".to_string() } else { tid.unwrap().to_string() };
+        let pid_val = if pid.is_none() {
+            "self".to_string()
+        } else {
+            pid.unwrap().to_string()
+        };
+        let tid_val = if tid.is_none() {
+            "self".to_string()
+        } else {
+            tid.unwrap().to_string()
+        };
 
         // Path to the scheduler stats file.
         let path = if tid.is_none() || tid.unwrap() == pid.unwrap() {
@@ -64,88 +72,88 @@ impl Sched {
         for line in content.lines() {
             if let Some(pos) = line.find(':') {
                 let key = line[..pos].trim().to_string();
-                let value = line[pos+1..].trim().to_string();
+                let value = line[pos + 1..].trim().to_string();
                 match key.as_str() {
                     "nr_migrations" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_migrations = val;
                         }
-                    },
+                    }
                     "nr_failed_migrations" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_failed_migrations = val;
                         }
-                    },
+                    }
                     "nr_forced_migrations" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_forced_migrations = val;
                         }
-                    },
+                    }
                     "nr_voluntary_switches" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_voluntary_switches = val;
                         }
-                    },
+                    }
                     "nr_involuntary_switches" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_involuntary_switches = val;
                         }
-                    },
+                    }
                     "nr_switches" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_switches = val;
                         }
-                    },
+                    }
                     "nr_preemptions" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_preemptions = val;
                         }
-                    },
+                    }
                     "nr_wakeups" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_wakeups = val;
                         }
-                    },
+                    }
                     "nr_wakeups_sync" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_wakeups_sync = val;
                         }
-                    },
+                    }
                     "nr_wakeups_migrate" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_wakeups_migrate = val;
                         }
-                    },
+                    }
                     "nr_wakeups_local" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_wakeups_local = val;
                         }
-                    },
+                    }
                     "nr_wakeups_remote" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_wakeups_remote = val;
                         }
-                    },
+                    }
                     "nr_yields" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.nr_yields = val;
                         }
-                    },
+                    }
                     "wait_sum" => {
                         if let Ok(val) = value.parse::<f64>() {
                             stats.wait_sum = val;
                         }
-                    },
+                    }
                     "wait_max" => {
                         if let Ok(val) = value.parse::<f64>() {
                             stats.wait_max = val;
                         }
-                    },
+                    }
                     "wait_count" => {
                         if let Ok(val) = value.parse::<u64>() {
                             stats.wait_count = val;
                         }
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -173,7 +181,11 @@ impl Sched {
     ///
     /// A Result containing the aggregated scheduler statistics.
     pub fn get_process_thread_stats(pid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if pid.is_none() { "self".to_string() } else { pid.unwrap().to_string() };
+        let pid_val = if pid.is_none() {
+            "self".to_string()
+        } else {
+            pid.unwrap().to_string()
+        };
         let task_dir = format!("/proc/{}/task", pid_val);
         let entries = fs::read_dir(&task_dir)
             .with_context(|| format!("Failed to read task directory: {}", task_dir))?;

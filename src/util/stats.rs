@@ -164,6 +164,137 @@ where
 
         None
     }
+
+    /// Visualize the density of the distribution as text.
+    pub fn visualize(&self, width: Option<usize>) -> String
+    where
+        T: std::fmt::Debug,
+    {
+        const BARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+        let min_label = self
+            .quantiles
+            .iter()
+            .find(|(p, _)| (*p - 0.001).abs() < 1e-6)
+            .map(|(_, v)| format!("{:?}", v))
+            .unwrap_or_else(|| "min".to_string());
+        let max_label = self
+            .quantiles
+            .iter()
+            .find(|(p, _)| (*p - 0.999).abs() < 1e-6)
+            .map(|(_, v)| format!("{:?}", v))
+            .unwrap_or_else(|| "max".to_string());
+        let p50_label = self
+            .quantiles
+            .iter()
+            .find(|(p, _)| (*p - 0.5).abs() < 1e-6)
+            .map(|(_, v)| format!("{:?}", v));
+        let p50_len = p50_label.as_ref().map(|s| s.len() + 2).unwrap_or(0); // spaces around p50
+        let bar_space = width
+            .or_else(|| term_size::dimensions().map(|(w, _)| w))
+            .unwrap_or(64)
+            .max(16);
+        let bar_width = bar_space
+            .saturating_sub(min_label.len() + 1)
+            .saturating_sub(p50_len + 2)
+            .saturating_sub(max_label.len() + 1)
+            .max(8);
+        let mut quantile_points = Vec::new();
+        for &(p, ref v) in &self.quantiles {
+            let value = to_f64(*v);
+            let idx = match p {
+                p if (p - 0.001).abs() < 1e-6 => 0, // p0
+                p if (p - 0.01).abs() < 1e-6 => 1,  // p10
+                p if (p - 0.1).abs() < 1e-6 => 2,   // p10
+                p if (p - 0.5).abs() < 1e-6 => 3,   // p50
+                p if (p - 0.9).abs() < 1e-6 => 2,   // p90
+                p if (p - 0.99).abs() < 1e-6 => 1,  // p99
+                p if (p - 0.999).abs() < 1e-6 => 0, // p100
+                _ => continue,
+            };
+            quantile_points.push((p, value, idx));
+        }
+        quantile_points.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let n = quantile_points.len();
+        let bar_indices: Vec<usize> = (0..n)
+            .map(|i| if i <= n / 2 { i } else { n - 1 - i })
+            .collect();
+        let min = quantile_points[0].1;
+        let max = quantile_points[n - 1].1;
+        let range = if (max - min).abs() < f64::EPSILON {
+            1.0
+        } else {
+            max - min
+        };
+        let max_bar = BARS.len() - 1;
+        let center = n / 2;
+        // Interpolate bar heights for each position.
+        let mut bar_vec = Vec::with_capacity(bar_width);
+        for x in 0..bar_width {
+            let rel = x as f64 / (bar_width - 1) as f64;
+            let value = min + rel * range;
+            let mut seg = 0;
+            while seg + 1 < n && value > quantile_points[seg + 1].1 {
+                seg += 1;
+            }
+            let (v1, b1) = (quantile_points[seg].1, bar_indices[seg]);
+            let (v2, b2) = if seg + 1 < n {
+                (quantile_points[seg + 1].1, bar_indices[seg + 1])
+            } else {
+                (quantile_points[seg].1, bar_indices[seg])
+            };
+            let t = if (v2 - v1).abs() < f64::EPSILON {
+                0.0
+            } else {
+                ((value - v1) / (v2 - v1)).clamp(0.0, 1.0)
+            };
+            let bar_f = b1 as f64 + (b2 as f64 - b1 as f64) * t;
+            let idx = ((bar_f / center.max(1) as f64) * max_bar as f64).round() as usize;
+            bar_vec.push(BARS[idx.min(max_bar)]);
+        }
+        // Compose the line: min |bars| max, with p50 in the middle.
+        let p50_value = self
+            .quantiles
+            .iter()
+            .find(|(p, _)| (*p - 0.5).abs() < 1e-6)
+            .map(|(_, v)| to_f64(*v));
+        let p50_pos = if let Some(p50_v) = p50_value {
+            let min = quantile_points[0].1;
+            let max = quantile_points[n - 1].1;
+            let range = if (max - min).abs() < f64::EPSILON {
+                1.0
+            } else {
+                max - min
+            };
+            (0..bar_width)
+                .map(|i| {
+                    let rel = i as f64 / (bar_width - 1) as f64;
+                    let v = min + rel * range;
+                    (i, (v - p50_v).abs())
+                })
+                .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+                .map(|(i, _)| i)
+                .unwrap_or(bar_width / 2)
+        } else {
+            bar_width / 2
+        };
+        let left: String = bar_vec.iter().take(p50_pos).collect();
+        let right: String = bar_vec.iter().skip(p50_pos).collect();
+        let mut line = String::new();
+        line.push_str(&min_label);
+        line.push(' ');
+        line.push('|');
+        line.push_str(&left);
+        if let Some(p50) = p50_label {
+            line.push(' ');
+            line.push_str(&p50);
+            line.push(' ');
+        }
+        line.push_str(&right);
+        line.push('|');
+        line.push(' ');
+        line.push_str(&max_label);
+        line
+    }
 }
 
 impl<T> fmt::Display for Estimates<T>
@@ -553,5 +684,26 @@ mod tests {
 
         assert!(display.contains("count: 3"));
         assert!(display.contains("p50: 2"));
+    }
+
+    #[test]
+    fn test_visualize() {
+        let mut dist = Distribution::<f64>::new();
+        dist.add(1.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(3.0);
+        dist.add(5.0);
+        let estimates = dist.estimates();
+        let bars = estimates.visualize(None);
+        println!("{}", bars);
     }
 }

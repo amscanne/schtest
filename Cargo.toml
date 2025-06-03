@@ -24,6 +24,7 @@ libtest-with = "0.8.1-6"
 tdigest = "0.2.3"
 more-asserts = "0.3"
 criterion = "0.5"
+term_size = "0.3.2"
 
 [dev-dependencies]
 rstest = "0.18"

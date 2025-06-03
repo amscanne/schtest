@@ -1,8 +1,8 @@
 //! Context for running workloads.
 
 use anyhow::Result;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::util::shared::{BumpAllocator, SharedBox, SharedVec};
 use crate::workloads::process::{Process, ProcessHandle};
@@ -50,10 +50,14 @@ impl Context {
     /// A new `Context` instance.
     pub fn create() -> Result<Self> {
         let allocator = BumpAllocator::new("context", Self::TOTAL_SIZE)?;
-        let running = Running{
+        let running = Running {
             data: SharedBox::new(allocator.clone(), AtomicBool::new(false))?,
         };
-        Ok(Self { allocator, running, processes: vec![] })
+        Ok(Self {
+            allocator,
+            running,
+            processes: vec![],
+        })
     }
 
     /// Adds a process to the context.
