@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{ArgAction, Parser};
-
-use libtest_with;
+use once_cell::sync::Lazy;
+use std::collections::HashSet;
+use std::sync::Mutex;
 use schtest::cases;
 use schtest::util::child::Child;
 use schtest::util::sched::SchedExt;
@@ -105,6 +106,18 @@ where
     libtest_with::Trial::test(name, test_fn).with_ignored_flag(ignore, ignore_reason)
 }
 
+static INTERNED_NAMES: Lazy<Mutex<HashSet<&'static str>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
+
+fn intern_string(s: String) -> &'static str {
+    // Leak the string to get a &'static str
+    let static_str: &'static str = Box::leak(s.into_boxed_str());
+    // Optionally track it to avoid leaking duplicates (not strictly necessary, but good hygiene)
+    let mut set = INTERNED_NAMES.lock().unwrap();
+    set.insert(static_str);
+    static_str
+}
+
 /// Run all registered tests.
 fn run_tests(args: &Args) -> libtest_with::Conclusion {
     let libtest_args = libtest_with::Arguments {
@@ -130,14 +143,15 @@ fn run_tests(args: &Args) -> libtest_with::Conclusion {
         use schtest::workloads::benchmark::BenchArgs;
         for t in inventory::iter::<cases::Benchmark> {
             #[allow(clippy::redundant_field_names)]
+            let name = intern_string((t.name)());
             let bench_args = BenchArgs {
-                name: t.name,
+                name,
                 sample_size: args.sample_size,
                 significance_level: args.significance_level,
                 percentile: args.percentile,
             };
             libtest_tests.push(make_trial(
-                t.name,
+                name,
                 move || {
                     (t.test_fn)(&bench_args).map_err(|e| libtest_with::Failed::from(e.to_string()))
                 },
@@ -146,8 +160,9 @@ fn run_tests(args: &Args) -> libtest_with::Conclusion {
         }
     } else {
         for t in inventory::iter::<cases::Test> {
+            let name = intern_string((t.name)());
             libtest_tests.push(make_trial(
-                t.name,
+                name,
                 || (t.test_fn)().map_err(|e| libtest_with::Failed::from(e.to_string())),
                 t.constraints,
             ));

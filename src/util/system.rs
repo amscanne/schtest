@@ -26,6 +26,12 @@ unsafe fn cpu_or(dest: &mut libc::cpu_set_t, src: &libc::cpu_set_t) {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct CPUMask {
+    /// The CPU mask as a `libc::cpu_set_t`.
+    mask: libc::cpu_set_t,
+}
+
 /// A trait for types that can provide a CPU mask.
 pub trait CPUSet {
     /// Get the CPU mask for this set
@@ -79,6 +85,23 @@ pub trait CPUSet {
     /// Migrate the current thread to this set.
     fn migrate(&self) -> Result<()> {
         self.run(|| {})
+    }
+}
+
+impl CPUMask {
+    /// Create a new `CPUMask` from a CPUSet.
+    pub fn new<T>(set: &T) -> Self
+    where
+        T: CPUSet,
+    {
+        Self { mask: set.mask() }
+    }
+}
+
+impl CPUSet for CPUMask {
+    /// Get the underlying `libc::cpu_set_t`.
+    fn mask(&self) -> libc::cpu_set_t {
+        self.mask
     }
 }
 
