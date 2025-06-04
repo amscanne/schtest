@@ -183,10 +183,9 @@ where
                     let elapsed = start.elapsed();
                     if let BenchResult::Count(v) = result {
                         let mut lock = last_throughput_clone.lock().unwrap();
-                        let val = v.clone();
-                        eprintln!("throughput: {}/s", val as f64 / elapsed.as_secs_f64());
+                        eprintln!("throughput: {}/s", v as f64 / elapsed.as_secs_f64());
                         io::stderr().flush().unwrap();
-                        *lock = Some(val);
+                        *lock = Some(v);
                     }
                     elapsed
                 });
