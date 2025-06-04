@@ -79,24 +79,28 @@ fn ping_pong(args: &BenchArgs, wake_type: WakeType) -> Result<()> {
         WakeType::Unpinned => CPUMask::new(&system),
     };
 
-    process!(&mut ctx, None, (mask, sem1, sem2), move |mut get_iters| {
-        mask.run(|| loop {
-            let iters = get_iters();
-            for _ in 0..iters {
-                sem1.produce(1, 1, None);
-                sem2.consume(1, 1, None);
-            }
-        })
-    });
-    process!(&mut ctx, None, (mask, sem1, sem2), move |mut get_iters| {
-        mask.run(|| loop {
-            let iters = get_iters();
-            for _ in 0..iters {
-                sem2.produce(1, 1, None);
-                sem1.consume(1, 1, None);
-            }
-        })
-    });
+    unsafe {
+        process!(&mut ctx, None, (mask, sem1, sem2), move |mut get_iters| {
+            mask.run(|| loop {
+                let iters = get_iters();
+                for _ in 0..iters {
+                    sem1.produce(1, 1, None);
+                    sem2.consume(1, 1, None);
+                }
+            })
+        });
+    }
+    unsafe {
+        process!(&mut ctx, None, (mask, sem1, sem2), move |mut get_iters| {
+            mask.run(|| loop {
+                let iters = get_iters();
+                for _ in 0..iters {
+                    sem2.produce(1, 1, None);
+                    sem1.consume(1, 1, None);
+                }
+            })
+        });
+    }
     measure!(&mut ctx, &args, "wake_latency", (sem1, sem2), |_| {
         let mut d = Distribution::<Duration>::default();
         sem1.collect_wake_stats(&mut d);

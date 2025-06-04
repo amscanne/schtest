@@ -225,10 +225,8 @@ impl Drop for Process {
 macro_rules! process {
     ($ctx:expr, $spec:expr, ($($var:ident),*), $func:expr) => {{
         $(let $var = $var.clone();)*
-        unsafe {
-            let p = $crate::workloads::process::Process::create($ctx, $func, $spec)?;
-            $ctx.add(p)
-        }
+        let p = $crate::workloads::process::Process::create($ctx, $func, $spec)?;
+        $ctx.add(p)
     }};
 }
 
