@@ -38,15 +38,17 @@ fn spread_out() -> Result<()> {
     let first_core = &cores[0];
 
     // Create a spinner for each process. They will all start on core[0].
-    for (_, _) in cores.iter().enumerate() {
-        let spinner = ctx.allocate(Spinner::new())?;
+    for _ in cores {
+        let spinner = ctx.allocate(Spinner::default())?;
         spinners.push(spinner.clone());
-        let proc = process!(&mut ctx, None, (first_core), move |mut get_iters| {
-            first_core.migrate()?; // Migrate to the core.
-            loop {
-                spinner.spin(Duration::from_millis(get_iters() as u64));
-            }
-        });
+        let proc = unsafe {
+            process!(&mut ctx, None, (first_core), move |mut get_iters| {
+                first_core.migrate()?; // Migrate to the core.
+                loop {
+                    spinner.spin(Duration::from_millis(get_iters() as u64));
+                }
+            })
+        };
         handles.push(proc);
     }
 
@@ -128,27 +130,29 @@ fn come_together() -> Result<()> {
     for _ in 0..complexes {
         let mut proc_spinners = Vec::new();
         for _ in 0..cores {
-            let spinner = ctx.allocate(Spinner::new())?;
+            let spinner = ctx.allocate(Spinner::default())?;
             proc_spinners.push(spinner);
         }
         let wakeup = ctx.allocate(Semaphore::<0, 0>::new(cores as u32))?;
-        process!(&mut ctx, None, (proc_spinners), move |mut get_iters| {
-            // Start `cores` different threads, each spinning on
-            // proc_spinning[i] independently.
-            std::thread::scope(|s| {
-                for spinner in proc_spinners.iter() {
-                    let spinner_clone = spinner.clone();
-                    s.spawn(move || loop {
-                        spinner_clone.spin(Duration::from_millis(1));
-                    });
-                }
-                loop {
-                    let iters = get_iters();
-                    wakeup.produce(iters, iters, None);
-                }
+        unsafe {
+            process!(&mut ctx, None, (proc_spinners), move |mut get_iters| {
+                // Start `cores` different threads, each spinning on
+                // proc_spinning[i] independently.
+                std::thread::scope(|s| {
+                    for spinner in proc_spinners.iter() {
+                        let spinner_clone = spinner.clone();
+                        s.spawn(move || loop {
+                            spinner_clone.spin(Duration::from_millis(1));
+                        });
+                    }
+                    loop {
+                        let iters = get_iters();
+                        wakeup.produce(iters, iters, None);
+                    }
+                });
+                Ok(())
             });
-            Ok(())
-        });
+        }
         spinners.push(proc_spinners);
     }
 

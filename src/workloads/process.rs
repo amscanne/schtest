@@ -14,6 +14,7 @@ use crate::workloads::context::Context;
 use crate::workloads::semaphore::Semaphore;
 
 /// A spec for a process to be started.
+#[derive(Default)]
 pub struct Spec {
     /// Priority for the process.
     priority: Option<i32>,
@@ -23,18 +24,6 @@ pub struct Spec {
 }
 
 impl Spec {
-    /// Create an empty process spec.
-    ///
-    /// # Returns
-    ///
-    /// An empty process spec.
-    pub fn new() -> Self {
-        Spec {
-            priority: None,
-            name: None,
-        }
-    }
-
     /// Set the priority of the process.
     ///
     /// # Arguments
@@ -73,7 +62,7 @@ pub struct ProcessHandle {
 impl ProcessHandle {
     /// Return the process pid.
     pub fn pid(&self) -> i32 {
-        return self.pid.as_raw();
+        self.pid.as_raw()
     }
 
     /// Return stats for the process.
@@ -111,8 +100,13 @@ impl Process {
     ///
     /// * `ctx` - The context for the process
     /// * `func` - The function to execute in the child process. This function takes another function
-    ///           as a parameter which, when called, returns the number of iterations to run.
+    ///   as a parameter which, when called, returns the number of iterations to run.
     /// * `spec` - Optional specifications for the process
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because forking a process in Rust can lead to undefined behavior if
+    /// not handled correctly.
     ///
     /// # Returns
     ///
@@ -163,10 +157,10 @@ impl Process {
 
         let mut proc = Self {
             _cgroup: cgroup,
-            child: child,
-            start: start,
-            ready: ready,
-            iters: iters,
+            child,
+            start,
+            ready,
+            iters,
         };
         proc.wait()?;
         Ok(proc)
@@ -225,10 +219,8 @@ impl Drop for Process {
 macro_rules! process {
     ($ctx:expr, $spec:expr, ($($var:ident),*), $func:expr) => {{
         $(let $var = $var.clone();)*
-        unsafe {
-            let p = $crate::workloads::process::Process::create($ctx, $func, $spec)?;
-            $ctx.add(p)
-        }
+        let p = $crate::workloads::process::Process::create($ctx, $func, $spec)?;
+        $ctx.add(p)
     }};
 }
 

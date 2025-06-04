@@ -88,8 +88,8 @@ impl Child {
     /// # Arguments
     ///
     /// * `f` - The function to run in the child process. This function can return a Result
-    ///         where the Ok variant indicates success and the Err variant contains an Error.
-    ///         If the function returns an Err, it will be serialized and passed back to the parent.
+    ///   where the Ok variant indicates success and the Err variant contains an Error.
+    ///   If the function returns an Err, it will be serialized and passed back to the parent.
     /// * `extra_flags` - Extra flags to pass to the clone system call.
     ///
     /// # Returns
@@ -113,8 +113,8 @@ impl Child {
         // Call clone with the given flags.
         let flags = extra_flags.unwrap_or(CloneFlags::empty());
         let pid = libc::syscall(
-            libc::SYS_clone as i64,
-            libc::SIGCHLD as i32 | flags.bits() as i32,
+            libc::SYS_clone,
+            libc::SIGCHLD | flags.bits(),
             0,
             0,
             0,
@@ -180,7 +180,7 @@ impl Child {
     /// # Arguments
     ///
     /// * `block` - Whether to block until the child exits. If false and the child
-    ///             hasn't exited yet, returns None.
+    ///   hasn't exited yet, returns None.
     /// * `all` - Whether to wait for all child processes. If true, waits for any child process.
     ///
     /// # Returns

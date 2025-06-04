@@ -66,7 +66,7 @@ where
     let max_time = max_time.unwrap_or(Duration::from_secs(10));
     let threshold = threshold.unwrap_or(0.95);
 
-    eprintln!("");
+    eprintln!();
     eprintln!(
         "converge: min_time={:.2}, max_time={:.2}, threshold={:.2}",
         min_time.as_secs_f64(),
@@ -164,7 +164,7 @@ where
                     }
                 })
             });
-            eprintln!("");
+            eprintln!();
             group.finish();
         }
         Ok(BenchResult::Count(_)) => {
@@ -183,16 +183,15 @@ where
                     let elapsed = start.elapsed();
                     if let BenchResult::Count(v) = result {
                         let mut lock = last_throughput_clone.lock().unwrap();
-                        let val = v.clone();
-                        eprintln!("throughput: {}/s", val as f64 / elapsed.as_secs_f64());
+                        eprintln!("throughput: {}/s", v as f64 / elapsed.as_secs_f64());
                         io::stderr().flush().unwrap();
-                        *lock = Some(val);
+                        *lock = Some(v);
                     }
                     elapsed
                 });
             });
-            let count = last_throughput.lock().unwrap().clone().unwrap_or(1);
-            group.throughput(Throughput::Elements(count as u64));
+            let count = last_throughput.lock().unwrap().unwrap_or(1);
+            group.throughput(Throughput::Elements(count));
             group.finish();
         }
         _ => {

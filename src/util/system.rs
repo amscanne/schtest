@@ -517,11 +517,11 @@ impl System {
             // Add this CPU to the topology map.
             topology
                 .entry(node_id)
-                .or_insert_with(std::collections::BTreeMap::new)
+                .or_default()
                 .entry(complex_id)
-                .or_insert_with(std::collections::BTreeMap::new)
+                .or_default()
                 .entry(core_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(cpu_id as i32);
         }
 

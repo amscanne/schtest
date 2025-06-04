@@ -140,12 +140,10 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
 
                 if rc == -1 && unsafe { *libc::__errno_location() } == libc::ETIMEDOUT {
                     return false;
-                } else if rc == 0 {
-                    if S != 0 {
-                        if let Some(elapsed) = self.wake.elapsed(cookie) {
-                            if R != 0 {
-                                self.reservoir.sample(elapsed);
-                            }
+                } else if rc == 0 && S != 0 {
+                    if let Some(elapsed) = self.wake.elapsed(cookie) {
+                        if R != 0 {
+                            self.reservoir.sample(elapsed);
                         }
                     }
                 }
@@ -248,12 +246,10 @@ impl<const S: usize, const R: usize> Semaphore<S, R> {
 
                 if rc == -1 && unsafe { *libc::__errno_location() } == libc::ETIMEDOUT {
                     return false;
-                } else if rc == 0 {
-                    if S != 0 {
-                        if let Some(elapsed) = self.wake.elapsed(cookie) {
-                            if R != 0 {
-                                self.reservoir.sample(elapsed);
-                            }
+                } else if rc == 0 && S != 0 {
+                    if let Some(elapsed) = self.wake.elapsed(cookie) {
+                        if R != 0 {
+                            self.reservoir.sample(elapsed);
                         }
                     }
                 }

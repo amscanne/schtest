@@ -43,15 +43,15 @@ impl Sched {
     ///
     /// A Result containing the scheduler statistics.
     pub fn get_thread_stats(pid: Option<Pid>, tid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if pid.is_none() {
-            "self".to_string()
+        let pid_val = if let Some(pid) = pid {
+            pid.to_string()
         } else {
-            pid.unwrap().to_string()
+            "self".to_string()
         };
-        let tid_val = if tid.is_none() {
-            "self".to_string()
+        let tid_val = if let Some(tid) = tid {
+            tid.to_string()
         } else {
-            tid.unwrap().to_string()
+            "self".to_string()
         };
 
         // Path to the scheduler stats file.
@@ -181,10 +181,10 @@ impl Sched {
     ///
     /// A Result containing the aggregated scheduler statistics.
     pub fn get_process_thread_stats(pid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if pid.is_none() {
-            "self".to_string()
+        let pid_val = if let Some(pid) = pid {
+            pid.to_string()
         } else {
-            pid.unwrap().to_string()
+            "self".to_string()
         };
         let task_dir = format!("/proc/{}/task", pid_val);
         let entries = fs::read_dir(&task_dir)
@@ -305,9 +305,7 @@ impl SchedExt {
         let status = status_content.trim();
 
         // Check if a scheduler is installed.
-        if status == "disabled" {
-            return Ok(None);
-        } else if status == "enabling" {
+        if status == "disabled" || status == "enabling" {
             return Ok(None);
         } else if status != "enabled" {
             return Err(anyhow!("Unexpected status: {}", status));

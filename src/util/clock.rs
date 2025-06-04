@@ -22,7 +22,7 @@ impl Timer {
         let reference = Instant::now();
         Self {
             start: AtomicU64::new(Instant::now().duration_since(reference).as_nanos() as u64),
-            reference: reference,
+            reference,
         }
     }
 
@@ -48,6 +48,12 @@ impl Timer {
             Instant::now().duration_since(self.reference).as_nanos() as u64,
             Ordering::SeqCst,
         );
+    }
+}
+
+impl Default for Timer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -132,6 +138,12 @@ impl<const S: usize> SplitTimer<S> {
             return None;
         }
         Some(v)
+    }
+}
+
+impl<const S: usize> Default for SplitTimer<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
