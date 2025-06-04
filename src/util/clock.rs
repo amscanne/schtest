@@ -51,6 +51,12 @@ impl Timer {
     }
 }
 
+impl Default for Timer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A robust timer that can handle multiple resets between elapsed time checks.
 ///
 /// This timer maintains an array of `Timer` instances and cycles through them,
