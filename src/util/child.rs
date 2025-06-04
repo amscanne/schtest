@@ -113,7 +113,7 @@ impl Child {
         // Call clone with the given flags.
         let flags = extra_flags.unwrap_or(CloneFlags::empty());
         let pid = libc::syscall(
-            libc::SYS_clone as i64,
+            libc::SYS_clone,
             libc::SIGCHLD | flags.bits(),
             0,
             0,
