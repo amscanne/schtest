@@ -97,6 +97,9 @@ impl BumpAllocator {
     }
 }
 
+unsafe impl Send for BumpAllocator {}
+unsafe impl Sync for BumpAllocator {}
+
 /// A box-like container that allocates an object in a BumpAllocator.
 ///
 /// This struct provides a safe wrapper around objects allocated in a BumpAllocator.
