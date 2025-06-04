@@ -15,7 +15,7 @@ pub struct Running {
 
 impl Running {
     pub fn running(&self) -> bool {
-        return self.data.load(Ordering::Relaxed);
+        self.data.load(Ordering::Relaxed)
     }
     pub fn start(&self) {
         self.data.store(true, Ordering::Relaxed);
