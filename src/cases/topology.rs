@@ -38,7 +38,7 @@ fn spread_out() -> Result<()> {
     let first_core = &cores[0];
 
     // Create a spinner for each process. They will all start on core[0].
-    for (_, _) in cores.iter().enumerate() {
+    for _ in cores {
         let spinner = ctx.allocate(Spinner::default())?;
         spinners.push(spinner.clone());
         let proc = unsafe {
