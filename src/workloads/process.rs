@@ -114,6 +114,11 @@ impl Process {
     ///           as a parameter which, when called, returns the number of iterations to run.
     /// * `spec` - Optional specifications for the process
     ///
+    /// # Safety
+    ///
+    /// This function is unsafe because forking a process in Rust can lead to undefined behavior if
+    /// not handled correctly.
+    ///
     /// # Returns
     ///
     /// A new `Process` instance.
