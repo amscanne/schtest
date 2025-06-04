@@ -572,7 +572,7 @@ where
 
         Estimates {
             count: self.digest.count() as usize,
-            quantiles: quantiles,
+            quantiles,
         }
     }
 
