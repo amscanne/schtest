@@ -22,7 +22,7 @@ impl Timer {
         let reference = Instant::now();
         Self {
             start: AtomicU64::new(Instant::now().duration_since(reference).as_nanos() as u64),
-            reference: reference,
+            reference,
         }
     }
 
