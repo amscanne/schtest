@@ -37,7 +37,7 @@ impl MemFd {
     pub fn create(name: &str, size: usize) -> io::Result<Self> {
         // Get the page size and round up the requested size to a multiple of the page size
         let page_size = nix::unistd::sysconf(nix::unistd::SysconfVar::PAGE_SIZE)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("System error: {}", e)))?
+            .map_err(|e| io::Error::other(format!("System error: {}", e)))?
             .unwrap() as usize;
 
         let rounded_up = (size + page_size - 1) & !(page_size - 1);
@@ -59,10 +59,7 @@ impl MemFd {
         // Set the size of the memfd.
         if let Err(e) = ftruncate(unsafe { BorrowedFd::borrow_raw(fd) }, rounded_up as i64) {
             let _ = close(fd);
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Failed to set size: {}", e),
-            ));
+            return Err(io::Error::other(format!("Failed to set size: {}", e)));
         }
 
         // Map the memfd into memory
@@ -77,10 +74,7 @@ impl MemFd {
             )
             .map_err(|e| {
                 let _ = close(fd);
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Memory mapping failed: {}", e),
-                )
+                io::Error::other(format!("Memory mapping failed: {}", e))
             })?
         };
 
