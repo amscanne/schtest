@@ -111,7 +111,7 @@ impl Process {
     ///
     /// * `ctx` - The context for the process
     /// * `func` - The function to execute in the child process. This function takes another function
-    ///           as a parameter which, when called, returns the number of iterations to run.
+    ///   as a parameter which, when called, returns the number of iterations to run.
     /// * `spec` - Optional specifications for the process
     ///
     /// # Safety
