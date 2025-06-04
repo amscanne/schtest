@@ -43,15 +43,15 @@ impl Sched {
     ///
     /// A Result containing the scheduler statistics.
     pub fn get_thread_stats(pid: Option<Pid>, tid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if pid.is_none() {
-            "self".to_string()
+        let pid_val = if let Some(pid) = pid {
+            pid.to_string()
         } else {
-            pid.unwrap().to_string()
+            "self".to_string()
         };
-        let tid_val = if tid.is_none() {
-            "self".to_string()
+        let tid_val = if let Some(tid) = tid {
+            tid.to_string()
         } else {
-            tid.unwrap().to_string()
+            "self".to_string()
         };
 
         // Path to the scheduler stats file.
