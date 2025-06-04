@@ -181,10 +181,10 @@ impl Sched {
     ///
     /// A Result containing the aggregated scheduler statistics.
     pub fn get_process_thread_stats(pid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if pid.is_none() {
-            "self".to_string()
+        let pid_val = if let Some(pid) = pid {
+            pid.to_string()
         } else {
-            pid.unwrap().to_string()
+            "self".to_string()
         };
         let task_dir = format!("/proc/{}/task", pid_val);
         let entries = fs::read_dir(&task_dir)
