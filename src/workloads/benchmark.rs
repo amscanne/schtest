@@ -192,7 +192,7 @@ where
                 });
             });
             let count = last_throughput.lock().unwrap().clone().unwrap_or(1);
-            group.throughput(Throughput::Elements(count as u64));
+            group.throughput(Throughput::Elements(count));
             group.finish();
         }
         _ => {
