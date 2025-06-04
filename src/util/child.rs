@@ -88,8 +88,8 @@ impl Child {
     /// # Arguments
     ///
     /// * `f` - The function to run in the child process. This function can return a Result
-    ///         where the Ok variant indicates success and the Err variant contains an Error.
-    ///         If the function returns an Err, it will be serialized and passed back to the parent.
+    ///   where the Ok variant indicates success and the Err variant contains an Error.
+    ///   If the function returns an Err, it will be serialized and passed back to the parent.
     /// * `extra_flags` - Extra flags to pass to the clone system call.
     ///
     /// # Returns
