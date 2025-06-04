@@ -157,10 +157,10 @@ impl Process {
 
         let mut proc = Self {
             _cgroup: cgroup,
-            child: child,
-            start: start,
-            ready: ready,
-            iters: iters,
+            child,
+            start,
+            ready,
+            iters,
         };
         proc.wait()?;
         Ok(proc)
