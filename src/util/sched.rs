@@ -305,9 +305,7 @@ impl SchedExt {
         let status = status_content.trim();
 
         // Check if a scheduler is installed.
-        if status == "disabled" {
-            return Ok(None);
-        } else if status == "enabling" {
+        if status == "disabled" || status == "enabling" {
             return Ok(None);
         } else if status != "enabled" {
             return Err(anyhow!("Unexpected status: {}", status));
