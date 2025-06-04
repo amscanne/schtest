@@ -135,6 +135,12 @@ impl<const S: usize> SplitTimer<S> {
     }
 }
 
+impl<const S: usize> Default for SplitTimer<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
