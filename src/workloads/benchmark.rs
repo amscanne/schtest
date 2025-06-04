@@ -66,7 +66,7 @@ where
     let max_time = max_time.unwrap_or(Duration::from_secs(10));
     let threshold = threshold.unwrap_or(0.95);
 
-    eprintln!("");
+    eprintln!();
     eprintln!(
         "converge: min_time={:.2}, max_time={:.2}, threshold={:.2}",
         min_time.as_secs_f64(),
@@ -164,7 +164,7 @@ where
                     }
                 })
             });
-            eprintln!("");
+            eprintln!();
             group.finish();
         }
         Ok(BenchResult::Count(_)) => {
