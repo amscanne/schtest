@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 /// A workload that spins for a specified duration.
+#[derive(Default)]
 pub struct Spinner {
     /// The ID of the CPU that the spinner last ran on.
     cpu_id: AtomicU32,
@@ -12,17 +13,6 @@ pub struct Spinner {
 impl Spinner {
     /// Default duration is 99 years.
     pub const DEFAULT_DURATION: Duration = Duration::from_secs(60 * 60 * 24 * 365 * 99);
-
-    /// Create a new spinner.
-    ///
-    /// # Returns
-    ///
-    /// A new `Spinner` instance.
-    pub fn new() -> Self {
-        Self {
-            cpu_id: AtomicU32::new(0),
-        }
-    }
 
     /// Spin for the specified duration.
     ///
@@ -73,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_spinner() -> Result<()> {
-        let spinner = Spinner::new();
+        let spinner = Spinner::default();
 
         // Spin for a short duration.
         spinner.spin(Duration::from_millis(10));

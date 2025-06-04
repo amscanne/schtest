@@ -39,7 +39,7 @@ fn spread_out() -> Result<()> {
 
     // Create a spinner for each process. They will all start on core[0].
     for (_, _) in cores.iter().enumerate() {
-        let spinner = ctx.allocate(Spinner::new())?;
+        let spinner = ctx.allocate(Spinner::default())?;
         spinners.push(spinner.clone());
         let proc = unsafe {
             process!(&mut ctx, None, (first_core), move |mut get_iters| {
@@ -130,7 +130,7 @@ fn come_together() -> Result<()> {
     for _ in 0..complexes {
         let mut proc_spinners = Vec::new();
         for _ in 0..cores {
-            let spinner = ctx.allocate(Spinner::new())?;
+            let spinner = ctx.allocate(Spinner::default())?;
             proc_spinners.push(spinner);
         }
         let wakeup = ctx.allocate(Semaphore::<0, 0>::new(cores as u32))?;

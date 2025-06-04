@@ -26,7 +26,7 @@ test!("self_test", self_test);
 fn self_bench(args: &BenchArgs) -> Result<()> {
     let mut ctx = Context::create()?;
     measure!(&mut ctx, &args, "1ms", (), |iters| {
-        let spinner = Spinner::new();
+        let spinner = Spinner::default();
         spinner.spin(Duration::from_millis(iters as u64));
         Ok(Count(iters as u64))
     })
