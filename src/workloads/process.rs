@@ -73,7 +73,7 @@ pub struct ProcessHandle {
 impl ProcessHandle {
     /// Return the process pid.
     pub fn pid(&self) -> i32 {
-        return self.pid.as_raw();
+        self.pid.as_raw()
     }
 
     /// Return stats for the process.
