@@ -180,7 +180,7 @@ impl Child {
     /// # Arguments
     ///
     /// * `block` - Whether to block until the child exits. If false and the child
-    ///             hasn't exited yet, returns None.
+    ///   hasn't exited yet, returns None.
     /// * `all` - Whether to wait for all child processes. If true, waits for any child process.
     ///
     /// # Returns
