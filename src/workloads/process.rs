@@ -14,6 +14,7 @@ use crate::workloads::context::Context;
 use crate::workloads::semaphore::Semaphore;
 
 /// A spec for a process to be started.
+#[derive(Default)]
 pub struct Spec {
     /// Priority for the process.
     priority: Option<i32>,
@@ -23,18 +24,6 @@ pub struct Spec {
 }
 
 impl Spec {
-    /// Create an empty process spec.
-    ///
-    /// # Returns
-    ///
-    /// An empty process spec.
-    pub fn new() -> Self {
-        Spec {
-            priority: None,
-            name: None,
-        }
-    }
-
     /// Set the priority of the process.
     ///
     /// # Arguments
