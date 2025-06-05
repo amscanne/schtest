@@ -104,6 +104,7 @@ macro_rules! benchmark {
 }
 
 pub mod basic;
+pub mod latency;
 pub mod topology;
 
 inventory::collect!(Test);
