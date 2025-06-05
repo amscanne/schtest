@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{ArgAction, Parser};
 use once_cell::sync::Lazy;
-use std::collections::HashSet;
-use std::sync::Mutex;
 use schtest::cases;
 use schtest::util::child::Child;
 use schtest::util::sched::SchedExt;
 use schtest::util::user::User;
+use std::collections::HashSet;
+use std::sync::Mutex;
 use std::{thread, time::Duration};
 
 /// Command line arguments for the schtest binary.
