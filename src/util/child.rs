@@ -102,7 +102,7 @@ impl Child {
     /// if the child process uses any resources that were initialized in the parent process.
     /// The caller must ensure that the function `f` does not use any resources that could
     /// cause issues when duplicated in the child process.
-    pub unsafe fn run<F>(f: F, extra_flags: Option<CloneFlags>) -> Result<Self>
+    pub fn run<F>(f: F, extra_flags: Option<CloneFlags>) -> Result<Self>
     where
         F: FnOnce() -> Result<()> + Send + 'static,
     {
@@ -112,15 +112,9 @@ impl Child {
 
         // Call clone with the given flags.
         let flags = extra_flags.unwrap_or(CloneFlags::empty());
-        let pid = libc::syscall(
-            libc::SYS_clone,
-            libc::SIGCHLD | flags.bits(),
-            0,
-            0,
-            0,
-            0,
-            0,
-        ) as i32;
+        let pid = unsafe {
+            libc::syscall(libc::SYS_clone, libc::SIGCHLD | flags.bits(), 0, 0, 0, 0, 0) as i32
+        };
         if pid == 0 {
             // This is the child process. We run the given function, and serialize
             // the result to the write end of the pipe.
@@ -313,32 +307,30 @@ impl Child {
         } else {
             CloneFlags::empty()
         };
-        unsafe {
-            Self::run(
-                move || {
-                    // Set up death signal to ensure child dies when parent dies.
-                    if let Err(e) = nix::sys::prctl::set_pdeathsig(Signal::SIGKILL) {
-                        return Err(anyhow!("Failed to set death signal: {}", e));
-                    }
-                    // Become the repear for any other subprocesses.
-                    if let Err(e) = nix::sys::prctl::set_child_subreaper(true) {
-                        return Err(anyhow!("Failed to set child subreaper: {}", e));
-                    }
-                    let mut child = Self::run(
-                        move || {
-                            let result = nix::unistd::execvp(&c_args[0], &c_args);
-                            match result {
-                                Ok(_) => Err(anyhow!("Failed to execute command")),
-                                Err(error) => Err(anyhow!("Failed to exec: {}", error)),
-                            }
-                        },
-                        None,
-                    )?;
-                    child.wait(true, true).unwrap()
-                },
-                Some(flags),
-            )
-        }
+        Self::run(
+            move || {
+                // Set up death signal to ensure child dies when parent dies.
+                if let Err(e) = nix::sys::prctl::set_pdeathsig(Signal::SIGKILL) {
+                    return Err(anyhow!("Failed to set death signal: {}", e));
+                }
+                // Become the repear for any other subprocesses.
+                if let Err(e) = nix::sys::prctl::set_child_subreaper(true) {
+                    return Err(anyhow!("Failed to set child subreaper: {}", e));
+                }
+                let mut child = Self::run(
+                    move || {
+                        let result = nix::unistd::execvp(&c_args[0], &c_args);
+                        match result {
+                            Ok(_) => Err(anyhow!("Failed to execute command")),
+                            Err(error) => Err(anyhow!("Failed to exec: {}", error)),
+                        }
+                    },
+                    None,
+                )?;
+                child.wait(true, true).unwrap()
+            },
+            Some(flags),
+        )
     }
 }
 
@@ -375,14 +367,14 @@ mod tests {
 
     #[test]
     fn test_run_success() {
-        let mut child = unsafe { Child::run(move || Ok(()), None).unwrap() };
+        let mut child = Child::run(move || Ok(()), None).unwrap();
         let result = child.wait(true, false).unwrap();
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_run_error() {
-        let mut child = unsafe { Child::run(move || Err(anyhow!("Test error")), None) }.unwrap();
+        let mut child = Child::run(move || Err(anyhow!("Test error")), None).unwrap();
 
         let result = child.wait(true, false).unwrap();
         assert!(!result.is_ok());

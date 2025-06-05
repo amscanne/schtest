@@ -111,7 +111,7 @@ impl Process {
     /// # Returns
     ///
     /// A new `Process` instance.
-    pub unsafe fn create<F>(ctx: &Context, func: F, spec: Option<Spec>) -> Result<Self>
+    pub fn create<F>(ctx: &Context, func: F, spec: Option<Spec>) -> Result<Self>
     where
         F: FnOnce(Box<dyn FnMut() -> u32 + Send>) -> Result<()> + Send + 'static,
     {
@@ -237,20 +237,18 @@ mod tests {
         let iter_values = ctx.allocate_vec(2, |_| AtomicU32::new(0))?;
         let iter_count_clone = iter_count.clone();
         let iter_values_clone = iter_values.clone();
-        let mut process = unsafe {
-            Process::create(
-                &ctx,
-                move |mut get_iters| loop {
-                    let iters = get_iters();
-                    let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
-                    iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
-                    let iters = get_iters();
-                    let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
-                    iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
-                },
-                None,
-            )?
-        };
+        let mut process = Process::create(
+            &ctx,
+            move |mut get_iters| loop {
+                let iters = get_iters();
+                let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
+                iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
+                let iters = get_iters();
+                let count = iter_count_clone.fetch_add(1, Ordering::SeqCst);
+                iter_values_clone[count as usize].store(iters, Ordering::SeqCst);
+            },
+            None,
+        )?;
 
         process.start(5);
         process.wait()?;
