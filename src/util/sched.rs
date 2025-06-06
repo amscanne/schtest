@@ -157,7 +157,7 @@ impl Sched {
         }
 
         let tid_val = if let Some(tid) = tid {
-            Process::new(tid.as_raw() as i32)
+            Process::new(tid.as_raw())
         } else {
             Process::myself()
 
