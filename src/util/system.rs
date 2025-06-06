@@ -159,7 +159,7 @@ impl Core {
     }
 
     /// Get the hyperthreads belonging to this core.
-    pub fn hyperthreads(&self) -> &[Hyperthread] {
+    pub fn hyperthreads(&self) -> &Vec<Hyperthread> {
         &self.hyperthreads
     }
 }
