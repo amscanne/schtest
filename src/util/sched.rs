@@ -371,10 +371,14 @@ mod tests {
     #[test]
     fn test_increasing_cpu_time() -> Result<()> {
         let initial_stats = Sched::get_current_thread_stats()?;
+        // utime isn't super accurate, spin for 200ms to make sure we accumulate enough CPU time.
+        let dur = Duration::from_millis(200);
+        let start = std::time::Instant::now();
         let mut sum: u64 = 0;
-        for i in 0..1_000_000 {
-            sum += i;
+        while start.elapsed() < dur {
+            sum += 1;
         }
+
         assert!(sum > 0);
         let final_stats = Sched::get_current_thread_stats()?;
         assert_gt!(
