@@ -2,12 +2,18 @@ use nix::unistd::Pid;
 use std::fs;
 use std::io::Read;
 use std::path::Path;
+use std::time::Duration;
+use procfs::{process::Process, ticks_per_second};
 
 use anyhow::{anyhow, Context, Result};
 
 /// Scheduler statistics for a thread.
 #[derive(Debug, Default, Clone)]
 pub struct SchedStats {
+    pub system_time: Duration,
+    pub user_time: Duration,
+    pub total_time: Duration,
+
     pub nr_migrations: u64,
     pub nr_failed_migrations: u64,
     pub nr_forced_migrations: u64,
@@ -42,12 +48,7 @@ impl Sched {
     /// # Returns
     ///
     /// A Result containing the scheduler statistics.
-    pub fn get_thread_stats(pid: Option<Pid>, tid: Option<Pid>) -> Result<SchedStats> {
-        let pid_val = if let Some(pid) = pid {
-            pid.to_string()
-        } else {
-            "self".to_string()
-        };
+    pub fn get_thread_stats(tid: Option<Pid>) -> Result<SchedStats> {
         let tid_val = if let Some(tid) = tid {
             tid.to_string()
         } else {
@@ -55,11 +56,7 @@ impl Sched {
         };
 
         // Path to the scheduler stats file.
-        let path = if tid.is_none() || tid.unwrap() == pid.unwrap() {
-            format!("/proc/{}/sched", pid_val)
-        } else {
-            format!("/proc/{}/task/{}/sched", pid_val, tid_val)
-        };
+        let path = format!("/proc/{}/sched", tid_val);
 
         // Read the scheduler stats for the given pid.
         let mut file = fs::File::open(&path)
@@ -159,6 +156,19 @@ impl Sched {
             }
         }
 
+        let tid_val = if let Some(tid) = tid {
+            Process::new(tid.as_raw())
+        } else {
+            Process::myself()
+
+        };
+        let proc = tid_val.with_context(|| "Failed to get process information")?;
+        let stat = proc.stat().with_context(|| "Failed to read process stat information")?;
+        let ticks_per_sec = ticks_per_second();
+        stats.system_time = Duration::from_secs_f64(stat.stime as f64 / ticks_per_sec as f64);
+        stats.user_time = Duration::from_secs_f64(stat.utime as f64 / ticks_per_sec as f64);
+        stats.total_time = stats.system_time + stats.user_time;
+
         Ok(stats)
     }
 
@@ -168,7 +178,7 @@ impl Sched {
     ///
     /// A Result containing the scheduler statistics.
     pub fn get_current_thread_stats() -> Result<SchedStats> {
-        Self::get_thread_stats(None, None)
+        Self::get_thread_stats(None)
     }
 
     /// Get aggregated scheduler statistics for all threads in a process.
@@ -196,27 +206,28 @@ impl Sched {
             let entry = entry?;
             let file_name = entry.file_name();
             let tid_str = file_name.to_string_lossy();
-
             if let Ok(tid) = tid_str.parse::<i32>() {
-                if let Ok(stats) = Self::get_thread_stats(pid, Some(Pid::from_raw(tid))) {
-                    aggregated_stats.nr_migrations += stats.nr_migrations;
-                    aggregated_stats.nr_failed_migrations += stats.nr_failed_migrations;
-                    aggregated_stats.nr_forced_migrations += stats.nr_forced_migrations;
-                    aggregated_stats.nr_voluntary_switches += stats.nr_voluntary_switches;
-                    aggregated_stats.nr_involuntary_switches += stats.nr_involuntary_switches;
-                    aggregated_stats.nr_switches += stats.nr_switches;
-                    aggregated_stats.nr_preemptions += stats.nr_preemptions;
-                    aggregated_stats.nr_wakeups += stats.nr_wakeups;
-                    aggregated_stats.nr_wakeups_sync += stats.nr_wakeups_sync;
-                    aggregated_stats.nr_wakeups_migrate += stats.nr_wakeups_migrate;
-                    aggregated_stats.nr_wakeups_local += stats.nr_wakeups_local;
-                    aggregated_stats.nr_wakeups_remote += stats.nr_wakeups_remote;
-                    aggregated_stats.nr_yields += stats.nr_yields;
-                    aggregated_stats.wait_sum += stats.wait_sum;
-                    aggregated_stats.wait_count += stats.wait_count;
-                    if stats.wait_max > aggregated_stats.wait_max {
-                        aggregated_stats.wait_max = stats.wait_max;
-                    }
+                let stats = Self::get_thread_stats(Some(Pid::from_raw(tid)))?;
+                aggregated_stats.system_time += stats.system_time;
+                aggregated_stats.user_time += stats.user_time;
+                aggregated_stats.total_time += stats.total_time;
+                aggregated_stats.nr_migrations += stats.nr_migrations;
+                aggregated_stats.nr_failed_migrations += stats.nr_failed_migrations;
+                aggregated_stats.nr_forced_migrations += stats.nr_forced_migrations;
+                aggregated_stats.nr_voluntary_switches += stats.nr_voluntary_switches;
+                aggregated_stats.nr_involuntary_switches += stats.nr_involuntary_switches;
+                aggregated_stats.nr_switches += stats.nr_switches;
+                aggregated_stats.nr_preemptions += stats.nr_preemptions;
+                aggregated_stats.nr_wakeups += stats.nr_wakeups;
+                aggregated_stats.nr_wakeups_sync += stats.nr_wakeups_sync;
+                aggregated_stats.nr_wakeups_migrate += stats.nr_wakeups_migrate;
+                aggregated_stats.nr_wakeups_local += stats.nr_wakeups_local;
+                aggregated_stats.nr_wakeups_remote += stats.nr_wakeups_remote;
+                aggregated_stats.nr_yields += stats.nr_yields;
+                aggregated_stats.wait_sum += stats.wait_sum;
+                aggregated_stats.wait_count += stats.wait_count;
+                if stats.wait_max > aggregated_stats.wait_max {
+                    aggregated_stats.wait_max = stats.wait_max;
                 }
             }
         }
@@ -332,6 +343,7 @@ mod tests {
     use super::*;
     use std::thread;
     use std::time::Duration;
+    use more_asserts::assert_gt;
 
     #[test]
     fn test_available() {
@@ -353,6 +365,32 @@ mod tests {
         let total_switches = stats.nr_voluntary_switches + stats.nr_involuntary_switches;
         assert!(total_switches > 0, "Expected some context switches");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_increasing_cpu_time() -> Result<()> {
+        let initial_stats = Sched::get_current_thread_stats()?;
+        // utime isn't super accurate, spin for 200ms to make sure we accumulate enough CPU time.
+        let dur = Duration::from_millis(200);
+        let start = std::time::Instant::now();
+        let mut sum: u64 = 0;
+        while start.elapsed() < dur {
+            sum += 1;
+        }
+
+        assert!(sum > 0);
+        let final_stats = Sched::get_current_thread_stats()?;
+        assert_gt!(
+            final_stats.user_time.as_nanos(),
+            initial_stats.user_time.as_nanos(),
+            "User time should increase after CPU-intensive work"
+        );
+        assert_gt!(
+            final_stats.total_time.as_nanos(),
+            initial_stats.total_time.as_nanos(),
+            "Total CPU time should increase after CPU-intensive work"
+        );
         Ok(())
     }
 }
