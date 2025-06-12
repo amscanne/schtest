@@ -5,12 +5,11 @@ use std::time::Duration;
 use anyhow::Result;
 
 use crate::test;
+use crate::util::system::CPUMask;
 use crate::util::system::{CPUSet, System};
+use crate::workloads::benchmark::converge;
 use crate::workloads::context::Context;
 use crate::workloads::spinner::Spinner;
-use crate::workloads::benchmark::converge;
-use crate::util::system::CPUMask;
-use crate::util::stats::Distribution;
 
 use crate::process;
 
@@ -20,13 +19,14 @@ use crate::process;
 /// floating task, and ensure that everyone gets approximate fairness in this case.
 fn fairness() -> Result<()> {
     let mut ctx = Context::create()?;
-    let mut proc_handles = vec!();
+    let mut affinitized_proc_handles = vec![];
+    let mut float_proc_handles = vec![];
 
     // Affinitized tasks.
     for core in System::load()?.cores().iter() {
         for hyperthread in core.hyperthreads().iter() {
             let mask = CPUMask::new(hyperthread);
-            proc_handles.push(process!(
+            affinitized_proc_handles.push(process!(
                 &mut ctx,
                 None,
                 (mask),
@@ -44,47 +44,44 @@ fn fairness() -> Result<()> {
 
     // Floating tasks.
     for _ in 0..System::load()?.logical_cpus() {
-        proc_handles.push(process!(
-            &mut ctx,
-            None,
-            (),
-            move |mut get_iters| {
-                let spinner = Spinner::default();
-                loop {
-                    spinner.spin(Duration::from_millis(get_iters() as u64));
-                }
+        float_proc_handles.push(process!(&mut ctx, None, (), move |mut get_iters| {
+            let spinner = Spinner::default();
+            loop {
+                spinner.spin(Duration::from_millis(get_iters() as u64));
             }
-        ));
+        }));
     }
 
     let metric = |iters| {
         ctx.start(iters);
         ctx.wait()?;
-        let mut d = Distribution::<Duration>::new();
-        let times: Vec<f64> = proc_handles.iter().map(|handle| {
-            match handle.stats() {
-                Ok(stats) => {
-                    d.add(stats.total_time);
-                    stats.total_time.as_secs_f64()
-                },
+        let affinitized_times: Vec<f64> = affinitized_proc_handles
+            .iter()
+            .map(|handle| match handle.stats() {
+                Ok(stats) => stats.total_time.as_secs_f64(),
                 Err(_) => 0.0,
-            }
-        }).collect();
-        let mean = times.iter().sum::<f64>() / times.len() as f64;
-        let estimates = d.estimates();
-        eprintln!("{}", estimates.visualize(None));
-        // Return the p10 of the runtimes as a fraction of the average runtime.
-        if let Some(p10) = estimates.percentile(0.1) {
-            Ok(p10.as_secs_f64()/mean)
+            })
+            .collect();
+        let float_times: Vec<f64> = float_proc_handles
+            .iter()
+            .map(|handle| match handle.stats() {
+                Ok(stats) => stats.total_time.as_secs_f64(),
+                Err(_) => 0.0,
+            })
+            .collect();
+        let affinitized_mean =
+            affinitized_times.iter().sum::<f64>() / affinitized_times.len() as f64;
+        let float_mean = float_times.iter().sum::<f64>() / float_times.len() as f64;
+        if float_mean > affinitized_mean {
+            Ok(affinitized_mean / float_mean)
         } else {
-            Ok(0.0) // Not enough samples.
+            Ok(float_mean / affinitized_mean)
         }
     };
 
-    // If the p10 of the runtimes is 60% of the average runtime, then we have
-    // achieved **some** level of fairness. If things were starved out completely,
-    // then we would actually expect the p10 to be near zero.
-    let target = 0.60;
+    // Perfectly fair is 1:1, so a threshold of 1.0, set the threshold to .95 to be as liberal as
+    // possible while still catching schedulers that will generally prefer affinitized tasks.
+    let target = 0.95;
     let final_value = converge(
         Some(Duration::from_secs_f64(5.0)),
         Some(Duration::from_secs_f64(10.0)),
