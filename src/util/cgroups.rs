@@ -78,6 +78,7 @@ impl Cgroup {
         let new_cgroup_path = cgroup_mount.join(&current_cgroup).join(&name);
         fs::create_dir_all(&new_cgroup_path).context("failed to create cgroup directory")?;
 
+
         Ok(Cgroup {
             info: CgroupInfo::new(new_cgroup_path),
         })
