@@ -100,7 +100,7 @@ impl Drop for Cgroup {
                 if let Ok(mut parent_tasks_file) = File::create(parent_path.join("tasks")) {
                     let reader = BufReader::new(tasks_file);
                     for line in reader.lines().map_while(Result::ok) {
-                        let _ = writeln!(parent_tasks_file, "{}", line);
+                        let _ = writeln!(parent_tasks_file, "{line}");
                     }
                 }
             }

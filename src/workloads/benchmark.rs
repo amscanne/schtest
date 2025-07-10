@@ -148,12 +148,12 @@ where
                 b.iter_custom(|iters| {
                     let result = match measure(iters as u32) {
                         Ok(v) => v,
-                        Err(e) => panic!("Benchmark failed: {:?}", e),
+                        Err(e) => panic!("Benchmark failed: {e:?}"),
                     };
                     if let BenchResult::Latency(dist) = result {
                         let est = dist.estimates();
                         let s = est.visualize(None);
-                        eprintln!("{}", s);
+                        eprintln!("{s}");
                         let latency = est
                             .percentile(args.percentile)
                             .unwrap_or(Duration::ZERO)
@@ -178,7 +178,7 @@ where
                     let start = Instant::now();
                     let result = match measure(iters as u32) {
                         Ok(v) => v,
-                        Err(e) => panic!("Benchmark failed: {:?}", e),
+                        Err(e) => panic!("Benchmark failed: {e:?}"),
                     };
                     let elapsed = start.elapsed();
                     if let BenchResult::Count(v) = result {
