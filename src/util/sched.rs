@@ -1,9 +1,9 @@
 use nix::unistd::Pid;
+use procfs::{process::Process, ticks_per_second};
 use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
-use procfs::{process::Process, ticks_per_second};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -56,14 +56,14 @@ impl Sched {
         };
 
         // Path to the scheduler stats file.
-        let path = format!("/proc/{}/sched", tid_val);
+        let path = format!("/proc/{tid_val}/sched");
 
         // Read the scheduler stats for the given pid.
         let mut file = fs::File::open(&path)
-            .with_context(|| format!("Failed to open scheduler stats file: {}", path))?;
+            .with_context(|| format!("Failed to open scheduler stats file: {path}"))?;
         let mut content = String::new();
         file.read_to_string(&mut content)
-            .with_context(|| format!("Failed to read scheduler stats file: {}", path))?;
+            .with_context(|| format!("Failed to read scheduler stats file: {path}"))?;
 
         let mut stats = SchedStats::default();
         for line in content.lines() {
@@ -160,10 +160,11 @@ impl Sched {
             Process::new(tid.as_raw())
         } else {
             Process::myself()
-
         };
         let proc = tid_val.with_context(|| "Failed to get process information")?;
-        let stat = proc.stat().with_context(|| "Failed to read process stat information")?;
+        let stat = proc
+            .stat()
+            .with_context(|| "Failed to read process stat information")?;
         let ticks_per_sec = ticks_per_second();
         stats.system_time = Duration::from_secs_f64(stat.stime as f64 / ticks_per_sec as f64);
         stats.user_time = Duration::from_secs_f64(stat.utime as f64 / ticks_per_sec as f64);
@@ -196,9 +197,9 @@ impl Sched {
         } else {
             "self".to_string()
         };
-        let task_dir = format!("/proc/{}/task", pid_val);
+        let task_dir = format!("/proc/{pid_val}/task");
         let entries = fs::read_dir(&task_dir)
-            .with_context(|| format!("Failed to read task directory: {}", task_dir))?;
+            .with_context(|| format!("Failed to read task directory: {task_dir}"))?;
 
         // Aggregate from all threads.
         let mut aggregated_stats = SchedStats::default();
@@ -341,9 +342,9 @@ impl SchedExt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use more_asserts::assert_gt;
     use std::thread;
     use std::time::Duration;
-    use more_asserts::assert_gt;
 
     #[test]
     fn test_available() {

@@ -175,19 +175,19 @@ where
             .quantiles
             .iter()
             .find(|(p, _)| (*p - 0.001).abs() < 1e-6)
-            .map(|(_, v)| format!("{:?}", v))
+            .map(|(_, v)| format!("{v:?}"))
             .unwrap_or_else(|| "min".to_string());
         let max_label = self
             .quantiles
             .iter()
             .find(|(p, _)| (*p - 0.999).abs() < 1e-6)
-            .map(|(_, v)| format!("{:?}", v))
+            .map(|(_, v)| format!("{v:?}"))
             .unwrap_or_else(|| "max".to_string());
         let p50_label = self
             .quantiles
             .iter()
             .find(|(p, _)| (*p - 0.5).abs() < 1e-6)
-            .map(|(_, v)| format!("{:?}", v));
+            .map(|(_, v)| format!("{v:?}"));
         let p50_len = p50_label.as_ref().map(|s| s.len() + 2).unwrap_or(0); // spaces around p50
         let bar_space = width
             .or_else(|| term_size::dimensions().map(|(w, _)| w))

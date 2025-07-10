@@ -64,7 +64,7 @@ fn run(args: Vec<String>) -> Result<Child> {
     // Run the given binary safely.
     eprintln!("spawning:");
     for arg in &args {
-        eprintln!(" - {}", arg);
+        eprintln!(" - {arg}");
     }
     let mut child = Child::spawn(&args).with_context(|| "unable to spawn child process")?;
 
@@ -82,7 +82,7 @@ fn run(args: Vec<String>) -> Result<Child> {
         // If it is installed, we're all set.
         let scheduler = SchedExt::installed().with_context(|| "unable to query scheduler")?;
         if let Some(scheduler_name) = scheduler {
-            eprintln!("scheduler: {}", scheduler_name);
+            eprintln!("scheduler: {scheduler_name}");
             return Ok(child);
         }
 

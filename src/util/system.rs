@@ -182,7 +182,7 @@ impl fmt::Display for Core {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", ht)?;
+            write!(f, "{ht}")?;
         }
         write!(f, "]}}")
     }
@@ -232,7 +232,7 @@ impl fmt::Display for CoreComplex {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", core)?;
+            write!(f, "{core}")?;
         }
         write!(f, "]}}")
     }
@@ -291,7 +291,7 @@ impl fmt::Display for Node {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", complex)?;
+            write!(f, "{complex}")?;
         }
         write!(f, "]}}")
     }
@@ -447,7 +447,7 @@ impl System {
         // Process each CPU.
         let base_path = Path::new("/sys/devices/system/cpu");
         for cpu_id in 0..num_cpus {
-            let cpu_path = base_path.join(format!("cpu{}", cpu_id));
+            let cpu_path = base_path.join(format!("cpu{cpu_id}"));
 
             // Skip if the CPU directory doesn't exist
             if !cpu_path.exists() {
@@ -484,7 +484,7 @@ impl System {
                 complex_id = die_id.trim().parse::<i32>().unwrap_or(0);
             } else {
                 // Try to use L3 cache as a proxy for complex.
-                let cache_path = base_path.join(format!("cpu{}", cpu_id)).join("cache");
+                let cache_path = base_path.join(format!("cpu{cpu_id}")).join("cache");
                 if cache_path.exists() {
                     // Look for L3 cache.
                     for entry in fs::read_dir(&cache_path)? {
@@ -565,7 +565,7 @@ impl fmt::Display for System {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", node)?;
+            write!(f, "{node}")?;
         }
         write!(f, "], logical_cpus={}}}", self.logical_cpus())
     }
